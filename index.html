@@ -1,0 +1,2507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Meilun Tire">
+<title>Meilun Tire — 轮胎库存管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
+<script>
+// Generate tire icon as PNG for apple-touch-icon & favicon
+(function(){
+  var c=document.createElement('canvas');c.width=180;c.height=180;
+  var ctx=c.getContext('2d');
+  // Background
+  ctx.fillStyle='#1a1a2e';
+  ctx.beginPath();ctx.arc(90,90,88,0,Math.PI*2);ctx.fill();
+  // Tire tread pattern
+  ctx.strokeStyle='#2d2d50';ctx.lineWidth=4;ctx.lineCap='round';
+  for(var i=0;i<16;i++){var a=(i/16)*Math.PI*2;
+    ctx.beginPath();ctx.moveTo(90+Math.cos(a)*78,90+Math.sin(a)*78);
+    ctx.lineTo(90+Math.cos(a)*87,90+Math.sin(a)*87);ctx.stroke();}
+  // Gradient ring
+  var g=ctx.createLinearGradient(30,30,150,150);
+  g.addColorStop(0,'#007AFF');g.addColorStop(1,'#5856D6');
+  ctx.strokeStyle=g;ctx.lineWidth=5;
+  ctx.beginPath();ctx.arc(90,90,68,0,Math.PI*2);ctx.stroke();
+  // Hub
+  ctx.fillStyle='#f5f5fa';
+  ctx.beginPath();ctx.arc(90,90,52,0,Math.PI*2);ctx.fill();
+  // Spokes
+  ctx.strokeStyle=g;ctx.lineWidth=5;ctx.lineCap='round';
+  for(var i=0;i<5;i++){var a=(i/5)*Math.PI*2-Math.PI/2;
+    ctx.beginPath();ctx.moveTo(90+Math.cos(a)*14,90+Math.sin(a)*14);
+    ctx.lineTo(90+Math.cos(a)*47,90+Math.sin(a)*47);ctx.stroke();}
+  // Center
+  ctx.fillStyle='#1a1a2e';
+  ctx.beginPath();ctx.arc(90,90,16,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#007AFF';
+  ctx.beginPath();ctx.arc(90,90,7,0,Math.PI*2);ctx.fill();
+  var d=c.toDataURL('image/png');
+  var l1=document.createElement('link');l1.rel='apple-touch-icon';l1.href=d;document.head.appendChild(l1);
+  var l2=document.createElement('link');l2.rel='icon';l2.type='image/png';l2.href=d;document.head.appendChild(l2);
+})();
+</script>
+<style>
+/* ===== Reset & Variables ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#EEF3FB;--card:#FFFFFF;--text:#1B2433;--text2:#5E6B82;--text3:#A9B4C8;
+  --sep:rgba(27,36,51,0.07);--blue:#2F6BFF;--green:#0FB5AE;--red:#FF5A5F;
+  --orange:#F5871F;--yellow:#FFC53D;--purple:#8B5CF6;--teal:#0FB5AE;
+  --pink:#2F6BFF;--indigo:#5B6BFF;--mint:#28D8A8;
+  --tab-bg:rgba(255,255,255,0.82);
+  --radius:18px;--radius-sm:12px;--radius-lg:26px;
+  --shadow:0 1px 2px rgba(27,36,51,0.05),0 8px 24px rgba(27,36,51,0.09);
+  --shadow-lg:0 16px 50px rgba(27,36,51,0.24);
+  --shadow-tint:0 6px 22px rgba(47,107,255,0.10);
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --accent:#2F6BFF;--accent-light:rgba(47,107,255,0.14);--accent-grad:linear-gradient(135deg,#5B8CFF 0%,#2F6BFF 100%);
+  --accent-shadow:0 12px 30px rgba(47,107,255,0.34);
+}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','PingFang SC','Helvetica Neue',sans-serif;
+  background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
+  overflow:hidden;height:100vh;height:100dvh;
+}
+/* Subtle mesh gradient background */
+#app{
+  background:
+    radial-gradient(ellipse 400px 200px at 20% 0%,rgba(47,107,255,0.07),transparent),
+    radial-gradient(ellipse 350px 180px at 80% 5%,rgba(139,92,246,0.06),transparent),
+    radial-gradient(ellipse 300px 160px at 50% 100%,rgba(15,181,174,0.05),transparent),
+    var(--bg);
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,textarea,select{font-family:inherit;font-size:inherit;color:inherit;outline:none;border:none;background:none}
+input::placeholder,textarea::placeholder{color:var(--text3)}
+
+/* ===== App Layout ===== */
+#app{
+  display:flex;flex-direction:column;height:100vh;height:100dvh;
+  max-width:430px;margin:0 auto;position:relative;overflow:hidden;
+  transition:--accent 0.3s;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(47,107,255,0.05) 1px, transparent 1px) 0 0/26px 26px,
+    radial-gradient(ellipse 460px 280px at 8% -8%, rgba(47,143,255,0.28), transparent 62%),
+    radial-gradient(ellipse 420px 260px at 96% -4%, rgba(15,181,174,0.22), transparent 64%),
+    radial-gradient(ellipse 420px 240px at 102% 62%, rgba(255,196,0,0.16), transparent 66%),
+    radial-gradient(ellipse 460px 300px at -4% 104%, rgba(139,92,246,0.20), transparent 64%),
+    var(--bg);
+}
+
+/* ===== Sidebar (desktop) ===== */
+#sidebar{display:none}
+.sidebar-logo{
+  font-size:22px;font-weight:800;letter-spacing:-0.5px;
+  padding:0 4px 20px;display:flex;align-items:center;gap:8px;
+}
+.sidebar-logo .logo-icon{
+  width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.sidebar-logo .logo-icon svg{width:30px;height:30px}
+.sidebar-logo .logo-text{
+  background:var(--accent-grad);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.sidebar-nav{display:flex;flex-direction:column;gap:3px}
+.sidebar-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;border-radius:10px;
+  color:var(--text2);font-size:15px;font-weight:500;
+  transition:all 0.15s;cursor:pointer;
+}
+.sidebar-item:hover{background:rgba(99,102,241,0.08)}
+.sidebar-item.active{
+  background:var(--accent-light);color:var(--accent);font-weight:600;
+}
+.sidebar-item svg{width:20px;height:20px;flex-shrink:0}
+.sidebar-footer{margin-top:auto;padding-top:16px}
+.sidebar-stat{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:6px 12px;font-size:13px;color:var(--text2);
+}
+.sidebar-stat b{color:var(--text);font-weight:700}
+.sidebar-sync{
+  margin-top:6px;padding:6px 12px;font-size:11px;color:var(--text3);
+  border-top:0.5px solid var(--sep);
+}
+
+/* ===== Header (glass hero) ===== */
+#header{
+  position:sticky;top:0;z-index:50;
+  padding:calc(var(--safe-top) + 14px) 18px 18px;
+  background:var(--accent-grad);
+  border-radius:0 0 26px 26px;
+  box-shadow:0 12px 32px var(--accent-shadow);
+  overflow:hidden;
+}
+#header::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,0.14) 1.3px, transparent 1.3px);
+  background-size:20px 20px;opacity:0.45;
+}
+#header::after{
+  content:'';position:absolute;top:-40px;right:-30px;width:160px;height:160px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,0.18),transparent 70%);
+  pointer-events:none;
+}
+.header-row{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1}
+.header-info{display:flex;align-items:center;gap:11px;min-width:0}
+.header-icon{
+  width:44px;height:44px;border-radius:14px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,0.22);color:#fff;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,0.32),0 4px 14px rgba(0,0,0,0.12);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+}
+.header-icon svg{width:28px;height:28px}
+.header-title{
+  font-family:'Ma Shan Zheng','KaiTi','STKaiti','Noto Serif SC','PingFang SC','Microsoft YaHei',serif;
+  font-size:27px;font-weight:700;letter-spacing:1px;line-height:1.15;
+  color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.20);
+}
+.header-sub{display:flex;align-items:center;gap:5px;margin-top:4px}
+.header-stat{font-size:11px;font-weight:600;padding:2px 9px;border-radius:9px;background:rgba(255,255,255,0.24);color:#fff;white-space:nowrap}
+.header-sep{color:rgba(255,255,255,0.7);font-size:10px}
+.header-btn{
+  width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.92);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 14px rgba(0,0,0,0.18);flex-shrink:0;color:var(--accent);
+  transition:transform .15s,background .15s;
+}
+.header-btn:active{transform:scale(0.9)}
+.header-btn svg{width:20px;height:20px;color:var(--accent)}
+.header-btn.spinning svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* decorative tire sticker on the header */
+.header-deco{
+  position:absolute;right:-18px;top:-20px;width:112px;height:112px;
+  color:rgba(255,255,255,0.14);transform:rotate(-16deg);pointer-events:none;z-index:0;
+  animation:spinSlow 24s linear infinite;
+}
+@keyframes spinSlow{from{transform:rotate(-16deg)}to{transform:rotate(344deg)}}
+.header-deco svg{width:100%;height:100%}
+
+/* ===== Main ===== */
+#content{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+#main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(100px + var(--safe-bottom))}
+.view{display:none;animation:fadeIn 0.25s ease}
+.view.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes cardIn{from{opacity:0;transform:translateY(14px) scale(.96)}55%{opacity:1;transform:translateY(-3px) scale(1.012)}to{opacity:1;transform:translateY(0) scale(1)}}
+.inv-group,.rec-group,.stocktake-card,.st-item{animation:cardIn .45s cubic-bezier(.22,1,.36,1) both}
+.brand-stat{animation:cardIn .4s cubic-bezier(.22,1,.36,1) both}
+
+/* ===== Stats Bar (glass pills) ===== */
+.stats-bar{
+  display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+  padding:12px 16px 2px;
+}
+.stats-pill{
+  display:flex;align-items:center;gap:5px;
+  font-size:12px;font-weight:600;padding:5px 12px;border-radius:20px;
+  background:rgba(255,255,255,0.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  box-shadow:var(--shadow);
+}
+.stats-pill.blue{color:var(--blue)}
+.stats-pill.green{color:var(--green)}
+.stats-pill.orange{color:var(--orange)}
+.stats-pill.purple{color:var(--purple)}
+.stats-pill.gray{color:var(--text2)}
+.stats-pill b{font-weight:800}
+.stats-bar .dot{width:3px;height:3px;border-radius:50%;background:var(--text3);display:inline-block}
+
+/* ===== Search ===== */
+.search-wrap{padding:8px 16px 10px;position:sticky;top:0;z-index:10;background:transparent}
+.search-bar{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.92);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:1px solid rgba(99,102,241,0.18);
+  border-radius:14px;padding:10px 14px;
+  box-shadow:0 3px 12px rgba(15,42,29,0.06);
+  transition:border-color .2s,box-shadow .2s;
+}
+.search-bar:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light),0 3px 12px rgba(15,42,29,0.06)}
+.search-bar svg{width:17px;height:17px;color:var(--accent);flex-shrink:0}
+.search-bar input{flex:1;font-size:15px}
+.search-clear{
+  width:18px;height:18px;border-radius:50%;background:var(--text3);
+  display:none;align-items:center;justify-content:center;flex-shrink:0;
+}
+.search-clear.show{display:flex}
+.search-clear svg{width:10px;height:10px;color:#fff}
+
+/* ===== Inventory List ===== */
+.inv-section-label{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:14px 16px 6px;
+}
+.inv-section-label .label{
+  font-size:13px;font-weight:700;color:var(--accent);letter-spacing:0.5px;
+  display:flex;align-items:center;gap:6px;
+}
+.inv-section-label .label::before{
+  content:'';width:3px;height:14px;border-radius:2px;
+  background:var(--accent-grad);
+}
+.inv-section-label .count{
+  font-size:11px;font-weight:600;color:var(--text2);
+  background:rgba(118,118,128,0.1);padding:2px 8px;border-radius:10px;
+}
+.brand-stats{padding:6px 0 10px}
+.brand-stats-head{display:flex;justify-content:space-between;align-items:center;padding:10px 16px 8px;margin-bottom:0}
+.brand-stats-title{font-size:14px;font-weight:700;color:var(--accent);letter-spacing:0.5px;display:flex;align-items:center;gap:6px}
+.brand-stats-title::before{content:'';width:3px;height:14px;border-radius:2px;background:var(--accent-grad)}
+.brand-stats-total{font-size:11px;color:var(--text2)}
+.brand-stats-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:6px;
+  padding:2px 16px 6px;
+}
+.brand-stat{
+  display:flex;flex-direction:row;align-items:baseline;justify-content:flex-start;gap:5px;
+  min-width:0;padding:8px 10px;border-radius:10px;
+  background:var(--card);
+  border:1px solid rgba(47,107,255,0.10);
+  border-left:3px solid var(--c,#cbd5e1);
+  cursor:pointer;transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s,background .18s;
+}
+.brand-stat:hover{transform:translateY(-2px)}
+.brand-stat:active{transform:scale(.96)}
+.brand-stat.active{
+  background:color-mix(in srgb,var(--c,var(--accent)) 25%,var(--card));
+  border-color:color-mix(in srgb,var(--c,var(--accent)) 30%,transparent);
+  box-shadow:0 8px 20px color-mix(in srgb,var(--c,var(--accent)) 20%,transparent);
+  transform:translateY(-2px);
+}
+.brand-stat.active .bs-brand{color:var(--c,var(--accent))}
+.brand-stat.active .bs-qty{color:var(--c,var(--accent))}
+.brand-stat.active .bs-qty i{color:color-mix(in srgb,var(--c,var(--accent)) 65%,#475569)}
+.brand-stat.active .bs-lines{color:rgba(255,255,255,0.85)}
+.brand-stat .bs-dot{display:none}
+.brand-stat .bs-brand{font-size:13px;font-weight:700;color:var(--text);min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brand-stat .bs-qty{font-size:15px;font-weight:800;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums;flex-shrink:0}
+.brand-stat .bs-qty i{font-size:10px;font-weight:600;font-style:normal;color:var(--text2);margin-left:2px}
+.brand-stat .bs-lines{font-size:9px;color:var(--text2)}
+.inv-list{padding:0 16px 20px}
+.inv-group{
+  background:var(--card);border-radius:var(--radius);
+  overflow:hidden;box-shadow:var(--shadow),var(--shadow-tint);
+  border:0.5px solid rgba(255,255,255,0.8);
+}
+.inv-row{
+  display:grid;align-items:center;gap:7px;
+  grid-template-columns:9px minmax(0,1fr) 116px 24px 56px;
+  padding:6px 14px;border-bottom:0.5px solid var(--sep);
+  cursor:pointer;position:relative;
+  transition:background 0.15s;
+}
+.inv-row:last-child{border-bottom:none}
+.inv-row:active{background:var(--accent-light)}
+.inv-head{
+  display:grid;align-items:center;gap:7px;
+  grid-template-columns:9px minmax(0,1fr) 116px 24px 56px;
+  padding:5px 14px;border-bottom:1px solid var(--sep);
+  font-size:10px;font-weight:700;color:var(--text3);letter-spacing:0.3px;
+}
+.inv-head .h-brand{text-align:left}
+.inv-head .h-pattern,.inv-head .h-qty,.inv-head .h-batch{text-align:center}
+.inv-dot{
+  grid-column:1;width:9px;height:9px;border-radius:50%;
+  box-shadow:0 0 0 2px rgba(255,255,255,0.7),0 1px 3px rgba(0,0,0,0.15);
+}
+.inv-brand-model{
+  grid-column:2;min-width:0;
+  font-size:14px;font-weight:700;color:var(--text);
+  line-height:1.3;letter-spacing:-0.2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.inv-pattern{
+  grid-column:3;width:116px;text-align:center;
+  font-size:10px;font-weight:600;color:#0E9C96;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:3px 7px;border-radius:8px;
+  background:rgba(15,181,174,0.12);
+  letter-spacing:0.1px;
+}
+.inv-pattern.empty{background:transparent;padding:0}
+.inv-qty{
+  grid-column:4;width:24px;text-align:center;
+  font-size:14px;font-weight:800;color:#fff;
+  padding:4px 0;border-radius:11px;
+  background:var(--accent-grad);
+  box-shadow:0 2px 8px var(--accent-shadow);
+  letter-spacing:-0.3px;
+}
+.inv-batch{
+  grid-column:5;width:56px;text-align:center;
+  font-size:10px;font-weight:600;color:var(--text2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:3px 4px;border-radius:6px;
+  background:rgba(118,118,128,0.1);
+  letter-spacing:-0.2px;
+}
+.inv-batch.empty{background:transparent;padding:0}
+@media(max-width:360px){
+  .inv-row{grid-template-columns:8px minmax(0,1fr) 104px 22px 52px;gap:6px}
+  .inv-head{grid-template-columns:8px minmax(0,1fr) 104px 22px 52px;gap:6px}
+  .inv-pattern{width:104px}
+  .inv-qty{width:22px}
+  .inv-batch{width:52px}
+}
+
+/* ===== Section Title ===== */
+.section-title{
+  font-size:13px;font-weight:700;color:var(--text2);
+  text-transform:uppercase;letter-spacing:0.5px;
+  padding:16px 16px 6px;
+  display:flex;align-items:center;gap:6px;
+}
+.section-title::before{
+  content:'';width:3px;height:14px;border-radius:2px;
+  background:var(--accent-grad);
+}
+
+/* ===== Record Rows ===== */
+.record-list{padding:0 16px 20px}
+.rec-group{
+  background:var(--card);border-radius:var(--radius);
+  overflow:hidden;box-shadow:var(--shadow),var(--shadow-tint);
+  border:0.5px solid rgba(255,255,255,0.8);
+}
+.rec-row{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 12px;border-bottom:0.5px solid var(--sep);
+  position:relative;
+}
+.rec-row:last-child{border-bottom:none}
+.rec-row:active{background:rgba(0,0,0,0.03)}
+.rec-row::before{
+  content:'';position:absolute;left:0;top:20%;bottom:20%;
+  width:3px;border-radius:0 2px 2px 0;
+}
+.rec-row.in::before{background:linear-gradient(180deg,#34C759,#30D158)}
+.rec-row.out::before{background:linear-gradient(180deg,#FF9500,#FF6B00)}
+.rec-dot{display:none}
+.rec-info{flex:1;min-width:0;overflow:hidden}
+.rec-name-line{display:flex;align-items:center;gap:5px;overflow:hidden}
+.rec-brand-model{
+  font-size:15px;font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;min-width:0;
+  letter-spacing:-0.2px;
+}
+.rec-pattern{
+  font-size:11px;font-weight:600;color:#2F6BFF;
+  white-space:nowrap;flex-shrink:0;padding:2px 7px;border-radius:8px;
+  background:rgba(47,107,255,0.12);
+}
+.rec-row.in .rec-pattern{background:rgba(15,181,174,0.12);color:#0FB5AE}
+.rec-row.out .rec-pattern{background:rgba(245,135,31,0.14);color:#F5871F}
+.rec-time{font-size:12px;color:var(--text3);margin-top:4px;white-space:nowrap;letter-spacing:0.3px}
+.rec-qty{
+  font-size:15px;font-weight:800;flex-shrink:0;min-width:40px;text-align:center;
+  padding:4px 9px;border-radius:8px;color:#fff;letter-spacing:-0.3px;
+}
+.rec-qty.in{background:linear-gradient(135deg,#34C759,#30D158);box-shadow:0 1px 4px rgba(52,199,89,0.25)}
+.rec-qty.out{background:linear-gradient(135deg,#FF9500,#FF6B00);box-shadow:0 1px 4px rgba(255,149,0,0.25)}
+.rec-actions{display:flex;gap:2px;flex-shrink:0}
+.rec-actions button{
+  width:24px;height:24px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;opacity:0.45;
+}
+.rec-actions button:active{transform:scale(0.85);opacity:1}
+.rec-actions .btn-edit{color:var(--text2)}
+.rec-actions .btn-delete{color:var(--text2)}
+.rec-actions svg{width:13px;height:13px}
+
+/* ===== Stocktake ===== */
+.stocktake-start{
+  margin:12px 16px;padding:24px 20px;border-radius:var(--radius-lg);
+  background:var(--accent-grad);
+  color:#fff;text-align:center;
+  box-shadow:0 8px 28px var(--accent-shadow);
+  position:relative;overflow:hidden;
+}
+.stocktake-start::before{
+  content:'';position:absolute;top:-30px;right:-30px;
+  width:120px;height:120px;border-radius:50%;
+  background:rgba(255,255,255,0.1);
+}
+.stocktake-start::after{
+  content:'';position:absolute;bottom:-20px;left:-20px;
+  width:80px;height:80px;border-radius:50%;
+  background:rgba(255,255,255,0.08);
+}
+.stocktake-start:active{transform:scale(0.98)}
+.stocktake-start svg{width:28px;height:28px;margin-bottom:8px}
+.stocktake-start h3{font-size:18px;font-weight:700}
+.stocktake-start p{font-size:13px;opacity:0.8;margin-top:4px}
+
+.stocktake-card{
+  background:var(--card);border-radius:var(--radius);padding:14px 16px;
+  margin-bottom:8px;box-shadow:var(--shadow),var(--shadow-tint);
+  border:0.5px solid rgba(255,255,255,0.8);
+}
+.st-top{display:flex;justify-content:space-between;align-items:center}
+.st-date{font-size:16px;font-weight:700;letter-spacing:-0.3px}
+.st-badge{
+  font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;
+  letter-spacing:0.3px;
+}
+.st-badge.ok{background:rgba(52,199,89,0.12);color:var(--green)}
+.st-badge.warn{background:rgba(255,149,0,0.12);color:var(--orange)}
+.st-summary{font-size:13px;color:var(--text2);margin-top:6px}
+.st-detail{display:none;margin-top:10px;padding-top:10px;border-top:0.5px solid var(--sep)}
+.st-detail.show{display:block}
+.st-detail-item{
+  display:flex;justify-content:space-between;font-size:13px;padding:4px 0;
+}
+.st-detail-item .diff-ok{color:var(--green)}
+.st-detail-item .diff-bad{color:var(--red)}
+.st-actions{
+  display:flex;gap:8px;margin-top:10px;padding-top:8px;
+  border-top:0.5px solid var(--sep);
+}
+.st-actions button{
+  font-size:13px;font-weight:600;padding:5px 12px;border-radius:7px;
+}
+.st-actions .btn-delete{color:var(--red);background:rgba(255,59,48,0.08)}
+
+/* ===== Stocktake Full Screen ===== */
+#stocktake-screen{
+  position:fixed;inset:0;z-index:200;background:var(--bg);
+  display:none;flex-direction:column;
+  max-width:430px;margin:0 auto;
+}
+#stocktake-screen.show{display:flex;animation:slideIn 0.3s ease}
+@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+.st-header{
+  padding:calc(var(--safe-top) + 8px) 16px 8px;
+  background:rgba(242,242,247,0.85);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:0.5px solid var(--sep);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.st-header h2{font-size:17px;font-weight:700}
+.st-header button{font-size:15px;font-weight:600}
+.st-header .cancel{color:var(--text2)}
+.st-header .done{color:var(--accent)}
+.st-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px 100px}
+.st-item{
+  background:var(--card);border-radius:var(--radius);padding:12px 14px;
+  margin-bottom:8px;box-shadow:var(--shadow),var(--shadow-tint);
+  border:0.5px solid rgba(255,255,255,0.8);
+}
+.st-item-top{display:flex;justify-content:space-between;align-items:center}
+.st-item-brand{font-size:15px;font-weight:700;flex:1;min-width:0;letter-spacing:-0.2px}
+.st-item-sys{font-size:13px;color:var(--text2);font-weight:600}
+.st-item-input-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.st-item-input-row label{font-size:13px;color:var(--text2);flex-shrink:0}
+.st-item-input-row input{
+  flex:1;background:rgba(118,118,128,0.08);border-radius:8px;
+  padding:8px 12px;font-size:16px;font-weight:600;text-align:center;
+  width:100%;transition:background 0.2s;
+}
+.st-item-input-row input:focus{background:var(--accent-light);color:var(--accent)}
+.st-item-diff{font-size:13px;font-weight:600;flex-shrink:0;min-width:50px;text-align:right}
+.st-item-diff.match{color:var(--green)}
+.st-item-diff.mismatch{color:var(--red)}
+
+/* ===== Tab Bar (floating glass pill) ===== */
+#tabbar{
+  position:fixed;bottom:calc(var(--safe-bottom) + 10px);left:50%;transform:translateX(-50%);
+  width:calc(100% - 28px);max-width:402px;
+  background:rgba(255,255,255,0.72);
+  backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
+  border:0.5px solid rgba(255,255,255,0.6);
+  border-radius:24px;
+  box-shadow:0 10px 30px rgba(15,42,29,0.16);
+  display:flex;padding:8px 6px;
+  z-index:100;
+}
+.tab{
+  flex:1;position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 0;color:var(--text2);transition:color 0.2s;
+}
+.tab.active{color:var(--accent)}
+.tab svg{width:23px;height:23px;transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
+.tab.active svg{transform:translateY(-1px) scale(1.06)}
+.tab span{font-size:10px;font-weight:500;transition:font-weight .2s}
+.tab.active span{font-weight:700}
+.tab::before{
+  content:'';position:absolute;top:3px;bottom:3px;left:50%;
+  width:52px;transform:translateX(-50%) scale(0);
+  border-radius:16px;background:var(--accent-light);
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1);
+}
+.tab.active::before{transform:translateX(-50%) scale(1)}
+
+/* ===== Bottom Sheet ===== */
+#sheet-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:150;
+  opacity:0;pointer-events:none;transition:opacity 0.25s;
+}
+#sheet-overlay.show{opacity:1;pointer-events:auto}
+#sheet{
+  position:fixed;bottom:0;left:50%;transform:translate(-50%,100%);
+  width:100%;max-width:430px;
+  background:var(--card);border-radius:20px 20px 0 0;
+  padding:20px 20px calc(var(--safe-bottom) + 20px);
+  z-index:151;transition:transform 0.3s cubic-bezier(0.32,0.72,0,1);
+  max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+#sheet.show{transform:translate(-50%,0)}
+.sheet-handle{
+  width:36px;height:5px;background:linear-gradient(90deg,var(--text3),var(--text2),var(--text3));border-radius:3px;
+  margin:0 auto 16px;
+}
+.sheet-title{
+  font-size:20px;font-weight:800;margin-bottom:16px;text-align:center;
+  letter-spacing:-0.3px;
+}
+
+/* ===== Form ===== */
+.form-group{
+  background:var(--card);border-radius:var(--radius);overflow:hidden;
+  margin-bottom:12px;box-shadow:var(--shadow);
+  border:0.5px solid rgba(255,255,255,0.8);
+}
+.form-row{
+  display:flex;align-items:center;padding:12px 16px;
+  border-bottom:0.5px solid var(--sep);
+}
+.form-row:last-child{border-bottom:none}
+.form-row label{
+  font-size:14px;font-weight:600;width:80px;flex-shrink:0;color:var(--text2);
+}
+.form-row input,.form-row select,.form-row textarea{
+  flex:1;font-size:15px;border:none;background:none;font-weight:500;
+}
+.form-row input:focus,.form-row textarea:focus,.form-row select:focus{
+  color:var(--accent);background:var(--accent-light);border-radius:8px
+}
+.form-row input::placeholder{color:var(--text3)}
+.form-row textarea{resize:none;min-height:60px;line-height:1.4}
+.form-hint{font-size:12px;color:var(--text2);padding:0 16px 8px}
+
+.btn-primary{
+  width:100%;padding:14px;border-radius:var(--radius);
+  background:var(--accent-grad);color:#fff;font-size:16px;font-weight:700;
+  margin-top:8px;transition:opacity 0.15s;
+  box-shadow:0 4px 14px var(--accent-shadow);
+  letter-spacing:0.5px;
+}
+.btn-primary:active{opacity:0.8;transform:scale(0.98)}
+.btn-secondary{
+  width:100%;padding:14px;border-radius:var(--radius);
+  background:rgba(118,118,128,0.12);color:var(--text);
+  font-size:16px;font-weight:600;margin-top:8px;
+}
+.btn-secondary:active{transform:scale(0.98)}
+.btn-danger-text{
+  width:100%;padding:12px;border-radius:var(--radius);
+  color:var(--red);font-size:15px;font-weight:500;margin-top:6px;
+  background:rgba(255,59,48,0.08);
+}
+.btn-danger-text:active{opacity:0.7;transform:scale(0.98)}
+
+/* ===== Modal ===== */
+#modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:160;
+  display:none;align-items:center;justify-content:center;
+  padding:40px;
+}
+#modal-overlay.show{display:flex;animation:fadeIn 0.2s ease}
+#modal{
+  background:var(--card);border-radius:18px;width:100%;max-width:270px;
+  overflow:hidden;animation:modalIn 0.25s ease;
+}
+@keyframes modalIn{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}
+#modal .modal-text{padding:20px;text-align:center}
+#modal .modal-title{font-size:17px;font-weight:600;margin-bottom:4px}
+#modal .modal-desc{font-size:13px;color:var(--text2)}
+#modal .modal-actions{display:flex;border-top:0.5px solid var(--sep)}
+#modal .modal-actions button{flex:1;padding:12px;font-size:17px;font-weight:600}
+#modal .modal-actions button:first-child{color:var(--text2);border-right:0.5px solid var(--sep)}
+#modal .modal-actions button:last-child{color:var(--red)}
+
+/* ===== Toast ===== */
+#toast{
+  position:fixed;bottom:calc(90px + var(--safe-bottom));left:50%;
+  transform:translateX(-50%) translateY(20px);
+  background:rgba(0,0,0,0.75);color:#fff;font-size:14px;
+  padding:10px 20px;border-radius:20px;z-index:300;
+  opacity:0;pointer-events:none;transition:all 0.25s;
+  white-space:nowrap;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ===== Empty State ===== */
+.empty-state{
+  text-align:center;padding:60px 20px;color:var(--text2);
+}
+.empty-state svg{width:48px;height:48px;color:var(--accent);opacity:0.3;margin-bottom:12px}
+.empty-state p{font-size:14px;line-height:1.6}
+
+/* ===== FAB ===== */
+.fab{
+  position:fixed;bottom:calc(100px + var(--safe-bottom));right:18px;
+  width:56px;height:56px;border-radius:18px;background:var(--accent-grad);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 10px 28px var(--accent-shadow);z-index:90;
+  transition:transform 0.18s cubic-bezier(.34,1.56,.64,1),background 0.3s;
+}
+.fab:active{transform:scale(0.88)}
+.fab svg{width:26px;height:26px;color:#fff}
+
+/* ===== Decorative floating sticker ===== */
+.deco-sticker{
+  position:fixed;left:6px;bottom:calc(92px + var(--safe-bottom));
+  width:62px;height:62px;color:var(--accent);opacity:0.09;
+  pointer-events:none;z-index:1;transform:rotate(-12deg);
+  animation:floatY 6s ease-in-out infinite;
+}
+@keyframes floatY{0%,100%{transform:rotate(-12deg) translateY(0)}50%{transform:rotate(-7deg) translateY(-9px)}}
+.deco-sticker svg{width:100%;height:100%}
+@media(min-width:768px){.deco-sticker{display:none}}
+
+/* ===== Scrollbar ===== */
+#main::-webkit-scrollbar,#sheet::-webkit-scrollbar{width:0}
+
+/* ===== Responsive: Desktop Workbench ===== */
+@media(min-width:768px){
+  body{background:#DCEFE2}
+  #app{
+    max-width:none;margin:0;flex-direction:row;
+    box-shadow:none;height:100vh;height:100dvh;
+  }
+  #sidebar{
+    display:flex;flex-direction:column;
+    width:230px;flex-shrink:0;
+    background:var(--card);
+    border-right:0.5px solid var(--sep);
+    padding:24px 16px;height:100vh;height:100dvh;
+    position:sticky;top:0;
+  }
+  #content{flex:1;display:flex;flex-direction:column;min-width:0}
+  #tabbar{display:none}
+  #main{padding-bottom:30px}
+  #header{padding:20px 32px 12px;border-radius:0}
+  .header-title{font-size:34px;font-family:'Ma Shan Zheng','KaiTi','STKaiti','Noto Serif SC','PingFang SC','Microsoft YaHei',serif}
+  .header-icon{width:44px;height:44px}
+  .header-icon svg{width:44px;height:44px}
+  .header-stat{font-size:12px}
+  .stats-bar{padding:12px 32px 4px}
+  .search-wrap{padding:8px 32px 10px}
+  .brand-stats-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:2px 32px 10px}
+  .brand-stat{padding:10px 14px;border-radius:12px;justify-content:space-between}
+  .brand-stat .bs-brand{font-size:14px}
+  .brand-stat .bs-qty{font-size:16px}
+  .inv-section-label{padding:16px 32px 6px}
+  .inv-list{padding:0 32px 24px}
+  .record-list{padding:0 32px 24px}
+  .section-title{padding:16px 32px 6px}
+  .inv-row,.rec-row{padding-left:14px;padding-right:14px}
+  .stocktake-start{margin:12px 32px}
+  .stocktake-card{margin-left:32px;margin-right:32px}
+  .fab{right:32px;bottom:24px}
+  #sheet{
+    max-width:480px;border-radius:20px;
+    top:50%;bottom:auto;
+    transform:translate(-50%,-50%) scale(0.96);
+    opacity:0;visibility:hidden;
+    transition:opacity 0.25s ease,visibility 0.25s,transform 0.3s cubic-bezier(0.32,0.72,0,1);
+  }
+  #sheet.show{
+    transform:translate(-50%,-50%) scale(1);
+    opacity:1;visibility:visible;
+  }
+  #stocktake-screen{max-width:none}
+  .st-header{padding:16px 32px 10px}
+  .st-body{padding:16px 32px 100px}
+  #toast{bottom:30px}
+  .empty-state{padding:80px 20px}
+}
+@media(min-width:1100px){
+  #header,.stats-bar,.search-wrap,.brand-stats,.inv-section-label,.inv-list,.record-list,.section-title,.stocktake-start{max-width:860px;margin-left:auto;margin-right:auto;width:100%}
+  .stocktake-card{max-width:828px;margin-left:auto;margin-right:auto}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar"></aside>
+  <div id="content">
+    <header id="header"></header>
+    <main id="main">
+      <section id="view-inventory" class="view active"></section>
+      <section id="view-inbound" class="view"></section>
+      <section id="view-outbound" class="view"></section>
+      <section id="view-stocktake" class="view"></section>
+    </main>
+  </div>
+  <nav id="tabbar"></nav>
+</div>
+<div id="sheet-overlay"></div>
+<div id="sheet"></div>
+<div id="modal-overlay"><div id="modal"></div></div>
+<div id="toast"></div>
+<div id="stocktake-screen"></div>
+<button class="fab" id="fab" onclick="handleAdd()" aria-label="新增"></button>
+<div class="deco-sticker" id="deco-sticker"></div>
+
+<script>
+/* ===== SVG Icons ===== */
+const I = {
+  inventory:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96 12 12.01l8.73-5.05M12 22.08V12"/></svg>',
+  inbound:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v14m0 0 5-5m-5 5-5-5M5 22h14"/></svg>',
+  outbound:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V8m0 0 5 5m-5-5-5 5M5 2h14"/></svg>',
+  stocktake:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+  clear:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.3 5.71 12 12.01l-6.3-6.3-1.42 1.41L10.59 13.4l-6.3 6.3 1.41 1.42 6.3-6.3 6.29 6.3 1.42-1.41-6.3-6.31 6.3-6.29z"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96 12 12.01l8.73-5.05M12 22.08V12"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  clipboard:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>',
+  chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>',
+};
+
+/* ===== Data Store ===== */
+const DB_KEY = 'tireos_v1';
+const BLOB_ID_KEY = 'tireos_blob_id';
+const JSONBLOB_BASE = 'https://jsonblob.com/api/jsonBlob';
+// Shared cloud blob ID baked into the page so the static CloudStudio link works
+// cross-network without needing a #sync=... in the URL. The local LAN server's
+// /api/blob-id overrides this when reachable (source of truth on the LAN).
+const DEFAULT_BLOB_ID = '019fabd8-ee17-7491-bfa6-f795a3cbc4bf';
+// Compiled snapshot of the local data, used as an absolute last-resort fallback
+// so the app always opens with correct (real-brand-name) data even when the
+// cloud blob is reclaimed or rate-limited. Regenerated on each deploy.
+const BASE_DATA = /*__BASE_DATA__*/ {"data":{"inventory":[{"id":"19f9cf691d7gl8bt","brand":"朝阳1号","model":"205/55R16","pattern":"ARISUN1","batch":"26","quantity":4,"createdAt":1785044832727,"updatedAt":1785220799687,"brandModel":"朝阳1号 205/55R16"},{"id":"19f9cf691d7ueq2r","brand":"朝阳1号","model":"215/55R17","pattern":"ARISUN1","batch":"0226","quantity":4,"createdAt":1785044832727,"updatedAt":1785220799687,"brandModel":"朝阳1号 215/55R17"},{"id":"19f9cf691d7cyui2","brand":"朝阳1号","model":"225/50R17","pattern":"ARISUN1","batch":"26","quantity":2,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d7df3ao","brand":"朝阳1号","model":"225/60R18","pattern":"ARISUN1 SUV","batch":"4825/4925","quantity":4,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d7nk9g3","brand":"朝阳1号","model":"235/50R19","pattern":"ARISUN1","batch":"0626","quantity":13,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d7ith08","brand":"朝阳1号","model":"235/50R19","pattern":"ARISUN1 EVPRO","batch":"0226","quantity":4,"createdAt":1785044832727,"updatedAt":1785217151831,"brandModel":"朝阳1号 235/50R19"},{"id":"19f9cf691d7ar4d3","brand":"朝阳1号","model":"235/55R19","pattern":"ARISUN1 EVPRO","batch":"26","quantity":2,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d7m4b0b","brand":"朝阳1号","model":"245/45R19","pattern":"ARISUN1 EVPRO","batch":"4925/0226","quantity":4,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d7thqs3","brand":"朝阳1号","model":"245/45R20","pattern":"ARISUN1 EVPRO","batch":"0226","quantity":1,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d7z383e","brand":"朝阳1号","model":"245/55R19","pattern":"ARISUN1","batch":"26","quantity":4,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d77fstj","brand":"朝阳1号","model":"255/40R20","pattern":"ARISUN1 EVPRO","batch":"2925/3325","quantity":4,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d7zds5p","brand":"朝阳1号","model":"255/45R19","pattern":"ARISUN1 EVPRO","batch":"26","quantity":8,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d72gmh2","brand":"朝阳1号","model":"255/45R20","pattern":"ARISUN1 EVPRO","batch":"26","quantity":1,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d77g9pt","brand":"朝阳1号","model":"255/45R21","pattern":"ARISUN1","batch":"26","quantity":4,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d7es93y","brand":"朝阳1号","model":"255/45R21","pattern":"ARISUN1 EVPRO","batch":"3825","quantity":2,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d7b5qlr","brand":"朝阳1号","model":"255/50R20","pattern":"ARISUN1 EVPRO","batch":"0326","quantity":2,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d7sjq08","brand":"朝阳1号","model":"265/40R22","pattern":"ARISUN1","batch":"5025","quantity":2,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d7efhj6","brand":"朝阳1号","model":"265/45R21","pattern":"ARISUN1 EVPRO","batch":"26","quantity":4,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"19f9cf691d89dzhh","brand":"朝阳","model":"215/55R17","pattern":"RP69","batch":"26","quantity":2,"createdAt":1785044833000,"updatedAt":1785476222914},{"id":"19f9cf691d8uscm5","brand":"朝阳","model":"245/45R19","pattern":"RP69","batch":"26","quantity":5,"createdAt":1785044832727,"updatedAt":1785217183685,"brandModel":"朝阳 245/45R19"},{"id":"19f9cf691d8gaisq","brand":"兴途","model":"215/55R17","pattern":"DU1","batch":"2226","quantity":9,"createdAt":1785044833000,"updatedAt":1785044833000},{"id":"ms1hkmrcimbcn","brand":"森麒麟","model":"195/65R15","pattern":"990","batch":"26","quantity":1,"createdAt":1785051498000,"updatedAt":1785051498000},{"id":"ms1kn2kr529vd","brand":"森麒麟","model":"215/60R16","pattern":"990","batch":"24/25/26","quantity":9,"createdAt":1785056650443,"updatedAt":1785218109862,"brandModel":"森麒麟 215/60R16"},{"id":"ms1knjns5t1v0","brand":"森麒麟","model":"235/45R18","pattern":"990","batch":"26","quantity":1,"createdAt":1785056673000,"updatedAt":1785056673000},{"id":"ms1kpjynxsivd","brand":"路航","model":"255/45R21","pattern":"迅龙SUV","batch":"26","quantity":1,"createdAt":1785056766287,"updatedAt":1785220998246,"brandModel":"路航 255/45R21"},{"id":"ms1kpvsqrteay","brand":"路航","model":"235/45R18","pattern":"迅龙","batch":"4524","quantity":1,"createdAt":1785056781626,"updatedAt":1785477521248,"brandModel":"路航 235/45R18"},{"id":"ms1kqv07hldq3","brand":"路航","model":"215/55R17","pattern":"迅龙","batch":"26","quantity":1,"createdAt":1785056827255,"updatedAt":1785056827255},{"id":"ms1krbkdtp4eq","brand":"路航","model":"195/65R15","pattern":"迅龙","batch":"1425/26","quantity":3,"createdAt":1785056848717,"updatedAt":1785218494966,"brandModel":"路航 195/65R15"},{"id":"ms1krpgpaa04i","brand":"路航","model":"255/40R20","pattern":"迅龙SUV","batch":"26","quantity":2,"createdAt":1785056867000,"updatedAt":1785056867000},{"id":"ms1m60lmvotny","brand":"森麒麟","model":"215/55R17","pattern":"1A","batch":"26","quantity":1,"createdAt":1785059214000,"updatedAt":1785487358842},{"id":"ms43pwm87xuo8","brand":"朝阳1号","model":"265/45R21","pattern":"ARISUN1 EV star","batch":"26","quantity":4,"createdAt":1785209628000,"updatedAt":1785209628000},{"id":"ms48o7s4wohis","brand":"森麒麟","model":"195/60R15","pattern":"990","batch":"1425","quantity":4,"createdAt":1785217947000,"updatedAt":1785217947000},{"id":"ms48ostq8rzv2","brand":"森麒麟","model":"195/60R16","pattern":"990","batch":"4124","quantity":1,"createdAt":1785217974254,"updatedAt":1785217974254},{"id":"ms48pbm8f1b9v","brand":"森麒麟","model":"205/55R16","pattern":"990","batch":"26","quantity":8,"createdAt":1785217999000,"updatedAt":1785217999000},{"id":"ms48q11dh18gc","brand":"森麒麟","model":"205/60R16","pattern":"990","batch":"24/改25","quantity":6,"createdAt":1785218032000,"updatedAt":1785218032000},{"id":"ms48qh90wu9ry","brand":"森麒麟","model":"215/50R17","pattern":"990","batch":"1425/26","quantity":5,"createdAt":1785218053000,"updatedAt":1785218053000},{"id":"ms48qu2v12a6s","brand":"森麒麟","model":"215/55R16","pattern":"990","batch":"2424","quantity":13,"createdAt":1785218069191,"updatedAt":1785218069191},{"id":"ms48s3d4k46ck","brand":"森麒麟","model":"225/45R19","pattern":"990","batch":"2424","quantity":3,"createdAt":1785218128000,"updatedAt":1785218128000},{"id":"ms48sfgqop4m2","brand":"森麒麟","model":"225/55R17","pattern":"990","batch":"4924","quantity":1,"createdAt":1785218144000,"updatedAt":1785218144000},{"id":"ms48swq590oqy","brand":"森麒麟","model":"225/65R17","pattern":"990SUV","batch":"4624","quantity":8,"createdAt":1785218166000,"updatedAt":1785218166000},{"id":"ms48t9625fjmx","brand":"森麒麟","model":"235/50R19","pattern":"990SUV","batch":"24","quantity":1,"createdAt":1785218182058,"updatedAt":1785218182058,"brandModel":"森麒麟 235/50R19"},{"id":"ms48tqnpnynmw","brand":"森麒麟","model":"245/45R20","pattern":"990","batch":"2424","quantity":2,"createdAt":1785218205000,"updatedAt":1785218205000},{"id":"ms48udv23olox","brand":"森麒麟","model":"205/55R16","pattern":"990防爆","batch":"23","quantity":1,"createdAt":1785218235000,"updatedAt":1785218235000},{"id":"ms48uq15bjgcf","brand":"森麒麟","model":"225/55R18","pattern":"990","batch":"0224","quantity":1,"createdAt":1785218251000,"updatedAt":1785218251000},{"id":"ms1ko6o3rllue","brand":"森麒麟","model":"265/40R22","pattern":"990","batch":"25","quantity":1,"createdAt":1785056702403,"updatedAt":1785056702403},{"id":"ms48yrrfmaz52","brand":"路航","model":"195/50R15","pattern":"迅龙","batch":"3123","quantity":1,"createdAt":1785218439435,"updatedAt":1785218439435,"brandModel":"路航 195/50R15"},{"id":"ms48zbfb7rzzw","brand":"路航","model":"195/60R16","pattern":"迅龙","batch":"0425","quantity":4,"createdAt":1785218465000,"updatedAt":1785218465000},{"id":"ms49uvnttiytz","brand":"路航","model":"205/60R16","pattern":"迅龙","batch":"4624","quantity":3,"createdAt":1785219937481,"updatedAt":1785219937481,"brandModel":"路航 205/60R16"},{"id":"ms49vda0p8pls","brand":"路航","model":"225/50R17","pattern":"迅龙","batch":"4524","quantity":1,"createdAt":1785219960312,"updatedAt":1785220059942,"brandModel":"路航 225/50R17"},{"id":"ms49wkvzf1lyj","brand":"路航","model":"245/45R19","pattern":"迅龙","batch":"24/3025","quantity":4,"createdAt":1785220017000,"updatedAt":1785220017000},{"id":"ms7c4ajmvl919","brand":"朝阳1号","model":"255/50R20","pattern":"ARISUN1","batch":"26","quantity":2,"createdAt":1785405134434,"updatedAt":1785405134434}],"inbound":[{"id":"19f9cf691d7bj7q0","time":1785044832727,"brand":"朝阳1号","model":"205/55R16","pattern":"ARISUN1","batch":"26","quantity":4,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 205/55R16"},{"id":"19f9cf691d7uhejo","time":1785044832727,"brand":"朝阳1号","model":"215/55R17","pattern":"ARISUN1","batch":"0226","quantity":4,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 215/55R17"},{"id":"19f9cf691d7zvlvx","time":1785044832727,"brand":"朝阳1号","model":"225/50R17","pattern":"ARISUN1","batch":"26","quantity":2,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 225/50R17"},{"id":"19f9cf691d7bm6nj","time":1785044832727,"brand":"朝阳1号","model":"225/60R18","pattern":"ARISUN1 SUV","batch":"4825/4925","quantity":4,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 225/60R18"},{"id":"19f9cf691d7untk8","time":1785044832727,"brand":"朝阳1号","model":"235/50R19","pattern":"ARISUN1","batch":"0626","quantity":13,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 235/50R19"},{"id":"19f9cf691d79t90n","time":1785044832727,"brand":"朝阳1号","model":"235/50R19","pattern":"ARISUN1 EVPRO","batch":"0226","quantity":2,"note":"","createdAt":1785044832727,"updatedAt":1785220998246,"brandModel":"朝阳1号 235/50R19"},{"id":"19f9cf691d7mlkq4","time":1785044832727,"brand":"朝阳1号","model":"235/55R19","pattern":"ARISUN1 EVPRO","batch":"26","quantity":2,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 235/55R19"},{"id":"19f9cf691d7tl2iv","time":1785044832727,"brand":"朝阳1号","model":"245/45R19","pattern":"ARISUN1 EVPRO","batch":"4925/0226","quantity":4,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 245/45R19"},{"id":"19f9cf691d7gcraq","time":1785044832727,"brand":"朝阳1号","model":"245/45R20","pattern":"ARISUN1 EVPRO","batch":"0226","quantity":1,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 245/45R20"},{"id":"19f9cf691d7bo6k9","time":1785044832727,"brand":"朝阳1号","model":"245/55R19","pattern":"ARISUN1","batch":"26","quantity":4,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 245/55R19"},{"id":"19f9cf691d75iws0","time":1785044832727,"brand":"朝阳1号","model":"255/40R20","pattern":"ARISUN1 EVPRO","batch":"2925/3325","quantity":4,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 255/40R20"},{"id":"19f9cf691d768kvd","time":1785044832727,"brand":"朝阳1号","model":"255/45R19","pattern":"ARISUN1 EVPRO","batch":"26","quantity":8,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 255/45R19"},{"id":"19f9cf691d7iymbk","time":1785044832727,"brand":"朝阳1号","model":"255/45R20","pattern":"ARISUN1 EVPRO","batch":"26","quantity":1,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 255/45R20"},{"id":"19f9cf691d77jji2","time":1785044832727,"brand":"朝阳1号","model":"255/45R21","pattern":"ARISUN1","batch":"26","quantity":4,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 255/45R21"},{"id":"19f9cf691d7ew90n","time":1785044832727,"brand":"朝阳1号","model":"255/45R21","pattern":"ARISUN1 EVPRO","batch":"3825","quantity":2,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 255/45R21"},{"id":"19f9cf691d7dl7hs","time":1785044820000,"brand":"朝阳1号","model":"255/50R20","pattern":"ARISUN1","batch":"26","quantity":2,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 255/50R20"},{"id":"19f9cf691d7j1diz","time":1785044832727,"brand":"朝阳1号","model":"255/50R20","pattern":"ARISUN1 EVPRO","batch":"0326","quantity":2,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 255/50R20"},{"id":"19f9cf691d7s2f70","time":1785044832727,"brand":"朝阳1号","model":"265/40R22","pattern":"ARISUN1","batch":"5025","quantity":2,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 265/40R22"},{"id":"19f9cf691d758md9","time":1785044832727,"brand":"朝阳1号","model":"265/45R21","pattern":"ARISUN1 EVPRO","batch":"26","quantity":4,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳1号 265/45R21"},{"id":"19f9cf691d876qts","time":1785044832727,"brand":"朝阳","model":"215/55R17","pattern":"RP69","batch":"26","quantity":10,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"朝阳 215/55R17"},{"id":"19f9cf691d8hmfp6","time":1785044820000,"brand":"朝阳","model":"245/45R19","pattern":"RP69","batch":"26","quantity":5,"note":"","createdAt":1785044820000,"updatedAt":1785044820000,"brandModel":"朝阳 245/45R19"},{"id":"19f9cf691d8pjtca","time":1785044832727,"brand":"兴途","model":"215/55R17","pattern":"DU1","batch":"2226","quantity":9,"note":"","createdAt":1785044832727,"updatedAt":1785044832727,"brandModel":"兴途 215/55R17"},{"id":"ms1hkmrb8b3rk","time":1785051420000,"brand":"森麒麟","model":"195/65R15","pattern":"990","batch":"26","quantity":1,"note":"理赔来的","createdAt":1785051420000,"updatedAt":1785051420000,"brandModel":"森麒麟 195/65R15"},{"id":"ms1kn2kqyjp4q","time":1785056580000,"brand":"森麒麟","model":"215/60R16","pattern":"990","batch":"26","quantity":2,"note":"理赔来的","createdAt":1785056580000,"updatedAt":1785056580000,"brandModel":"森麒 215/60R16"},{"id":"ms1knjns7kpw7","time":1785056640000,"brand":"森麒麟","model":"235/45R18","pattern":"990","batch":"26","quantity":1,"note":"理赔来的","createdAt":1785056640000,"updatedAt":1785056640000,"brandModel":"森麒麟 235/45R18"},{"id":"ms1ko6o2y277c","time":1785056640000,"brand":"森麒麟","model":"265/40R22","pattern":"990","batch":"25","quantity":1,"note":"理赔来的","createdAt":1785056640000,"updatedAt":1785056640000,"brandModel":"森麒麟 265/40R22"},{"id":"ms1kpjyny700j","time":1785056700000,"brand":"路航","model":"255/45R21","pattern":"迅龙SUV","batch":"26","quantity":1,"note":"理赔来的","createdAt":1785056700000,"updatedAt":1785056700000,"brandModel":"路航 255/45R21"},{"id":"ms1kpvspsgrl3","time":1785056760000,"brand":"路航","model":"235/45R18","pattern":"迅龙","batch":"26","quantity":2,"note":"理赔来的","createdAt":1785056760000,"updatedAt":1785056760000,"brandModel":"路航 235/45R18"},{"id":"ms1kqv07vpiod","time":1785056760000,"brand":"路航","model":"215/55R17","pattern":"迅龙","batch":"26","quantity":1,"note":"理赔来的","createdAt":1785056760000,"updatedAt":1785056760000,"brandModel":"路航 215/55R17"},{"id":"ms1krbkdgzrie","time":1785056820000,"brand":"路航","model":"195/65R15","pattern":"迅龙","batch":"26","quantity":2,"note":"理赔来的","createdAt":1785056820000,"updatedAt":1785056820000,"brandModel":"路航 195/65R15"},{"id":"ms1krpgpts2uz","time":1785056820000,"brand":"路航","model":"255/40R20","pattern":"迅龙SUV","batch":"26","quantity":2,"note":"理赔来的","createdAt":1785056820000,"updatedAt":1785056820000,"brandModel":"路航 255/40R20"},{"id":"ms1m60lms4vyx","time":1785059160000,"brand":"森麒麟","model":"215/55R17","pattern":"1A","batch":"26","quantity":6,"note":"","createdAt":1785059160000,"updatedAt":1785059160000,"brandModel":"森麒麟 215/55R17"},{"id":"ms43pwm8b2wcf","time":1785209580000,"brand":"朝阳1号","model":"265/45R21","pattern":"ARISUN1 EV star","batch":"26","quantity":4,"note":"","createdAt":1785209580000,"updatedAt":1785209580000,"brandModel":"朝阳1号 265/45R21"},{"id":"ms48768n7y3ge","time":1785217080000,"brand":"朝阳1号","model":"235/50R19","pattern":"ARISUN1 EVPRO","batch":"0626","quantity":2,"note":"","createdAt":1785217080000,"updatedAt":1785217080000,"brandModel":"朝阳1号 235/50R19"},{"id":"ms48o7s4a0jh7","time":1785217920000,"brand":"森麒麟","model":"195/60R15","pattern":"990","batch":"1425","quantity":4,"remark":"","createdAt":1785217920000,"note":"","brandModel":"森麒麟195/60R15"},{"id":"ms48ostq3wlcn","time":1785217920000,"brand":"森麒麟","model":"195/60R16","pattern":"990","batch":"4124","quantity":1,"remark":"","createdAt":1785217920000,"note":"","brandModel":"森麒麟195/60R16"},{"id":"ms48pbm8b4f4z","time":1785217920000,"brand":"森麒麟","model":"205/55R16","pattern":"990","batch":"26","quantity":8,"remark":"","createdAt":1785217920000,"note":"","brandModel":"森麒麟205/55R16"},{"id":"ms48q11duq10w","time":1785217980000,"brand":"森麒麟","model":"205/60R16","pattern":"990","batch":"24/改25","quantity":6,"remark":"","createdAt":1785217980000,"note":"","brandModel":"森麒麟205/60R16"},{"id":"ms48qh90m2ws6","time":1785217980000,"brand":"森麒麟","model":"215/50R17","pattern":"990","batch":"1425/26","quantity":5,"remark":"","createdAt":1785217980000,"note":"","brandModel":"森麒麟215/50R17"},{"id":"ms48qu2vuoo89","time":1785218040000,"brand":"森麒麟","model":"215/55R16","pattern":"990","batch":"2424","quantity":13,"remark":"","createdAt":1785218040000,"note":"","brandModel":"森麒麟215/55R16"},{"id":"ms48rdt4iwdl7","time":1785218040000,"brand":"森麒麟","model":"215/60R16","pattern":"990","batch":"24/25","quantity":7,"remark":"","createdAt":1785218040000,"note":"","brandModel":"森麒麟215/60R16"},{"id":"ms48s3d40q80m","time":1785218100000,"brand":"森麒麟","model":"225/45R19","pattern":"990","batch":"2424","quantity":3,"remark":"","createdAt":1785218100000,"note":"","brandModel":"森麒麟225/45R19"},{"id":"ms48sfgq5ld6v","time":1785218100000,"brand":"森麒麟","model":"225/55R17","pattern":"990","batch":"4924","quantity":1,"remark":"","createdAt":1785218100000,"note":"","brandModel":"森麒麟225/55R17"},{"id":"ms48swq55ivdu","time":1785218100000,"brand":"森麒麟","model":"225/65R17","pattern":"990SUV","batch":"4624","quantity":8,"remark":"","createdAt":1785218100000,"note":"","brandModel":"森麒麟225/65R17"},{"id":"ms48t962w19au","time":1785218160000,"brand":"森麒麟","model":"235/50R19","pattern":"990SUV","batch":"24","quantity":1,"remark":"","createdAt":1785218160000,"note":"","brandModel":"森麒麟235/50R19"},{"id":"ms48tqnp58zkf","time":1785218160000,"brand":"森麒麟","model":"245/45R20","pattern":"990","batch":"2424","quantity":2,"remark":"","createdAt":1785218160000,"note":"","brandModel":"森麒麟245/45R20"},{"id":"ms48udv28k2mg","time":1785218220000,"brand":"森麒麟","model":"205/55R16","pattern":"990防爆","batch":"23","quantity":1,"remark":"","createdAt":1785218220000,"note":"","brandModel":"森麒麟205/55R16"},{"id":"ms48uq15za5ks","time":1785218220000,"brand":"森麒麟","model":"225/55R18","pattern":"990","batch":"0224","quantity":1,"remark":"","createdAt":1785218220000,"note":"","brandModel":"森麒麟225/55R18"},{"id":"ms48yrrfpe3dy","time":1785218400000,"brand":"路航","model":"195/50R15","pattern":"迅龙","batch":"3123","quantity":1,"remark":"","createdAt":1785218400000,"note":"","brandModel":"路航195/50R15"},{"id":"ms48zbfbmmh49","time":1785218400000,"brand":"路航","model":"195/60R16","pattern":"迅龙","batch":"0425","quantity":4,"remark":"","createdAt":1785218400000,"note":"","brandModel":"路航195/60R16"},{"id":"ms48zq4pmi9o8","time":1785218460000,"brand":"路航","model":"195/65R15","pattern":"迅龙","batch":"1425","quantity":1,"remark":"","createdAt":1785218460000,"note":"","brandModel":"路航195/65R15"},{"id":"ms49uvntiamo6","time":1785219900000,"brand":"路航","model":"205/60R16","pattern":"迅龙","batch":"4624","quantity":3,"remark":"","createdAt":1785219900000,"note":"","brandModel":"路航205/60R16"},{"id":"ms49vda0wrhk1","time":1785219900000,"brand":"路航","model":"225/50R17","pattern":"迅龙","batch":"4524","quantity":1,"remark":"","createdAt":1785219900000,"note":"","brandModel":"路航225/50R17"},{"id":"ms49vq69k1h3k","time":1785219960000,"brand":"路航","model":"235/45R18","pattern":"迅龙","batch":"4524","quantity":3,"remark":"","createdAt":1785219960000,"note":"","brandModel":"路航235/45R18"},{"id":"ms49wkvzny1z0","time":1785219960000,"brand":"路航","model":"245/45R19","pattern":"迅龙","batch":"24/3025","quantity":4,"remark":"","createdAt":1785219960000,"note":"","brandModel":"路航245/45R19"}],"outbound":[{"id":"ms5sphz8de36t","time":1785312000000,"brand":"朝阳","model":"215/55R17","pattern":"RP69","batch":"26","quantity":4,"remark":"","createdAt":1785312000000,"note":"","brandModel":"朝阳215/55R17"},{"id":"ms74vi87ojwaf","time":1785392940000,"brandModel":"森麒麟 215/55R17","pattern":"1A","batch":"26","quantity":1,"note":"","createdAt":1785392967175},{"id":"ms8cw4lesja6m","time":1785466860000,"brandModel":"朝阳 215/55R17","pattern":"RP69","batch":"26","quantity":4,"note":"","createdAt":1785466899266},{"id":"ms8j7ic6kx7yq","time":1785304620000,"brandModel":"路航 235/45R18","pattern":"迅龙","batch":"4524/3 26/2","quantity":4,"note":"","createdAt":1785477507990},{"id":"ms8p2naym740f","time":1785487320000,"brandModel":"森麒麟 215/55R17","pattern":"1A","batch":"26","quantity":4,"note":"","createdAt":1785487358842}],"stocktakes":[],"ts":1785487359149},"ts":1785487359149};
+
+let db = { inventory: [], inbound: [], outbound: [], stocktakes: [] };
+let _serverMode = false;       // true if syncing with server
+let _cloudMode = false;        // true if using jsonblob cloud sync
+let _blobId = null;            // jsonblob ID for cloud sync
+let _lastSyncTs = 0;           // timestamp of last server data
+let _syncing = false;          // prevent sync loops
+let _saveCount = 0;            // increments on every local save
+let _pushedCount = 0;          // last save count successfully pushed
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
+
+// ===== Cloud sync helpers (jsonblob.com) =====
+function getBlobId() {
+  // Priority: URL hash > localStorage
+  const hashMatch = location.hash.match(/sync=([a-f0-9-]+)/);
+  if (hashMatch) {
+    _blobId = hashMatch[1];
+    localStorage.setItem(BLOB_ID_KEY, _blobId);
+    return _blobId;
+  }
+  const stored = localStorage.getItem(BLOB_ID_KEY);
+  if (stored) { _blobId = stored; return _blobId; }
+  return null;
+}
+
+function setBlobId(id) {
+  _blobId = id;
+  localStorage.setItem(BLOB_ID_KEY, id);
+  // Update URL hash without page reload
+  const newHash = `sync=${id}`;
+  if (location.hash !== '#' + newHash) {
+    history.replaceState(null, '', '#' + newHash);
+  }
+}
+
+// ===== Cloud data compression (jsonblob anonymous tier has 10KB limit) =====
+// Compress full db into compact format with short keys to stay under limit
+function _splitBrandModel(bm) {
+  if (!bm) return ['', ''];
+  const s = bm.trim();
+  // Split a tire size (e.g. 265/45R21) from the brand, with or without a space
+  const m = s.match(/^(.*?)[\s\-]*(\d{3}\s*[/.xX]\s*\d{2,3}\s*[Rr]?\s*\d{2}\b.*)$/);
+  if (m && m[1].trim()) return [m[1].trim(), m[2].trim()];
+  const m2 = s.match(/^(\D+?)(\d.*)$/);
+  if (m2) return [m2[1].trim(), m2[2].trim()];
+  return [s, ''];
+}
+
+function compressForCloud(db) {
+  // Omit empty optional fields to stay within jsonblob's 10KB anonymous limit.
+  const clean = (s) => (s === undefined || s === null) ? '' : String(s).trim();
+  const pick = (o) => { const r = {}; for (const k in o) { const v = o[k]; if (v !== '' && v !== undefined && v !== null) r[k] = v; } return r; };
+  // Brand dictionary + second-precision timestamps keep us under jsonblob's
+  // 10KB anonymous limit even with 100+ records.
+  const brands = {};
+  (db.inventory || []).concat(db.inbound || [], db.outbound || []).forEach(it => {
+    let b = it.brand || '';
+    if (!b && it.brandModel) { const [pb] = _splitBrandModel(it.brandModel); b = pb; }
+    if (b) brands[b] = true;
+  });
+  const bd = {};
+  let _code = 33;
+  Object.keys(brands).forEach(b => { bd[b] = String.fromCharCode(_code++); });
+  const bcode = (b) => { if (!b) return ''; return bd[b] !== undefined ? bd[b] : b; };
+  const _ts = (t) => (t ? Math.round(Number(t) / 1000) : 0);
+  return {
+    bd,
+    i: (db.inventory || []).map(it => pick({ i: it.id, b: bcode(it.brand), m: clean(it.model), p: clean(it.pattern), bt: clean(it.batch), q: it.quantity, c: _ts(it.createdAt) })),
+    ib: (db.inbound || []).map(it => {
+      let b = it.brand || '', m = it.model || '';
+      if (!b && it.brandModel) { const [pb, pm] = _splitBrandModel(it.brandModel); b = pb; m = m || pm; }
+      return pick({ i: it.id, t: _ts(it.time), b: bcode(b), m: clean(m), p: clean(it.pattern), bt: clean(it.batch), q: it.quantity });
+    }),
+    ob: (db.outbound || []).map(it => {
+      let b = it.brand || '', m = it.model || '';
+      if (!b && it.brandModel) { const [pb, pm] = _splitBrandModel(it.brandModel); b = pb; m = m || pm; }
+      return pick({ i: it.id, t: _ts(it.time), b: bcode(b), m: clean(m), p: clean(it.pattern), bt: clean(it.batch), q: it.quantity });
+    }),
+    st: (db.stocktakes || []).map(it => pick({ i: it.id, t: _ts(it.time), items: it.items })),
+    ts: _ts(db.ts)
+  };
+}
+
+// Decompress compact format back to full db (also handles legacy full format)
+function decompressFromCloud(d) {
+  if (!d) return null;
+  // Legacy format detection: has full 'inventory' key
+  if (d.inventory) return d;
+  // Compact format (may use a brand dictionary + second-precision timestamps)
+  const bd = d.bd || {};
+  // NOTE: compressForCloud stores bd as { brandName: code }. To decode we must
+  // reverse it into { code: brandName } first, otherwise bdec would look up a
+  // code with a name-keyed map and always fall through to returning the code.
+  const bdRev = {};
+  for (const name in bd) { if (bd[name] != null) bdRev[bd[name]] = name; }
+  const bdec = (c) => { if (!c) return ''; return bdRev[c] !== undefined ? bdRev[c] : c; };
+  const ms = (t) => { if (!t) return 0; t = Number(t); return t < 1e12 ? t * 1000 : t; };
+  const rebuildBM = (b, m) => (b && m) ? (b + m) : (b || m || '');
+  const now = Date.now();
+  return {
+    inventory: (d.i || []).map(x => ({
+      id: x.i, brand: bdec(x.b) || '', model: x.m || '', pattern: x.p || '',
+      batch: x.bt || '', quantity: x.q,
+      createdAt: ms(x.c) || now, updatedAt: ms(x.c) || now
+    })),
+    inbound: (d.ib || []).map(x => ({
+      id: x.i, time: ms(x.t), brand: bdec(x.b) || '', model: x.m || '', pattern: x.p || '',
+      batch: x.bt || '', quantity: x.q, remark: x.r || '',
+      createdAt: ms(x.t) || now, note: x.n || '',
+      brandModel: rebuildBM(bdec(x.b), x.m)
+    })),
+    outbound: (d.ob || []).map(x => ({
+      id: x.i, time: ms(x.t), brand: bdec(x.b) || '', model: x.m || '', pattern: x.p || '',
+      batch: x.bt || '', quantity: x.q, remark: x.r || '',
+      createdAt: ms(x.t) || now, note: x.n || '',
+      brandModel: rebuildBM(bdec(x.b), x.m)
+    })),
+    stocktakes: (d.st || []).map(x => ({
+      id: x.i, time: ms(x.t), items: x.items || []
+    })),
+    ts: ms(d.ts) || 0
+  };
+}
+
+// ===== Corruption guard =====
+// Mobile IME/keyboard glitches occasionally inject U+FFFD (the UTF-8 replacement
+// char). Left in brand/pattern strings they render as "?" boxes and spawn phantom
+// brand cards (e.g. "朝??1号"). They are irrecoverable, so we strip them on every
+// save/push; the rest of the string stays intact for the user to re-edit.
+function _stripBad(s) {
+  if (typeof s !== 'string') return s;
+  return s.indexOf('\uFFFD') === -1 ? s : s.split('\uFFFD').join('');
+}
+function sanitizeDB(d) {
+  if (!d) return d;
+  const arr = a => (Array.isArray(a) ? a.filter(r => r && r.id !== 'probe' && !(r.brand && r.brand.indexOf('探针') >= 0)).map(r => {
+    if (!r || typeof r !== 'object') return r;
+    const o = {};
+    for (const k in r) o[k] = _stripBad(r[k]);
+    return o;
+  }) : a);
+  return {
+    inventory: arr(d.inventory),
+    inbound: arr(d.inbound),
+    outbound: arr(d.outbound),
+    stocktakes: arr(d.stocktakes),
+    ts: d.ts
+  };
+}
+
+async function cloudFetch() {
+  const id = getBlobId();
+  if (!id) return null;
+  try {
+    const resp = await fetch(`${JSONBLOB_BASE}/${id}`, {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    if (!resp.ok) return null;
+    const raw = await resp.json();
+    return decompressFromCloud(raw);
+  } catch(e) { return null; }
+}
+
+async function cloudCreate(data) {
+  // Create a new blob
+  const payload = compressForCloud(data);
+  const resp = await fetch(JSONBLOB_BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!resp.ok) throw new Error('Failed to create blob');
+  const id = resp.headers.get('X-jsonblob-id') || resp.headers.get('Location');
+  if (!id) {
+    // Fallback: parse from Location header
+    const loc = resp.headers.get('Location') || '';
+    const match = loc.match(/([a-f0-9-]{36})/);
+    if (match) { setBlobId(match[1]); return match[1]; }
+    throw new Error('No blob ID returned');
+  }
+  // Clean up the ID (might be full URL or just ID)
+  const cleanId = id.replace(/.*\//, '').trim();
+  setBlobId(cleanId);
+  return cleanId;
+}
+
+async function cloudPush(data) {
+  data = sanitizeDB(data);
+  const id = getBlobId();
+  const payload = compressForCloud(data);
+  if (!id) {
+    // No blob yet, create one
+    await cloudCreate(data);
+    return true;
+  }
+  try {
+    const resp = await fetch(`${JSONBLOB_BASE}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (resp.ok) return true;
+    if (resp.status === 404) {
+      // Blob expired, create a new one
+      await cloudCreate(data);
+      return true;
+    }
+    return false;
+  } catch(e) {
+    return false;
+  }
+}
+
+// ===== Unified sync abstraction =====
+// Low-level fetchers — each returns { data, ts } or null
+async function fetchServerData() {
+  try {
+    const resp = await fetch('/api/data', { cache: 'no-store' });
+    if (!resp.ok) return null;
+    const result = await resp.json();
+    if (result.data && result.data.inventory) return { data: result.data, ts: result.ts || 0 };
+  } catch(e) {}
+  return null;
+}
+async function fetchCloudData() {
+  const id = getBlobId();
+  if (id) {
+    try {
+      const resp = await fetch(`${JSONBLOB_BASE}/${id}`, {
+        headers: { 'Accept': 'application/json' }, cache: 'no-store'
+      });
+      if (resp.ok) {
+        const raw = await resp.json();
+        const d = decompressFromCloud(raw);
+        if (d && d.inventory) return { data: d, ts: d.ts || 0 };
+      }
+    } catch(e) {}
+  }
+  // Blob missing / reclaimed / rate-limited -> fall back to the static mirror
+  // deployed alongside this page so the app never opens blank. A later write
+  // (cloudPush) will auto-recreate the blob from whatever data we have.
+  return await cloudMirrorFallback();
+}
+// Static read-only mirror bundled with the deployment (original full format).
+async function cloudMirrorFallback() {
+  try {
+    const resp = await fetch('./data.json', { cache: 'no-store' });
+    if (resp.ok) {
+      const raw = await resp.json();
+      if (raw && raw.data && raw.data.inventory) return { data: raw.data, ts: raw.ts || 0, mirror: true };
+    }
+  } catch(e) {}
+  // Absolute fallback baked into the page (compiled snapshot, never blank)
+  if (typeof BASE_DATA !== 'undefined' && BASE_DATA && BASE_DATA.data && BASE_DATA.data.inventory) {
+    return { data: BASE_DATA.data, ts: BASE_DATA.ts || 0, mirror: true, builtin: true };
+  }
+  return null;
+}
+// Converge the lagging backend to keep cloud and local server consistent.
+// Preserve the data's ts so the two backends never ping-pong.
+async function convergeToServer(data) {
+  data = sanitizeDB(data);
+  try {
+    await fetch('/api/data', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data, ts: data.ts || Date.now() })
+    });
+  } catch(e) {}
+}
+async function convergeToCloud(data) {
+  data = sanitizeDB(data);
+  const id = getBlobId();
+  if (!id) return;
+  try {
+    const payload = compressForCloud(data);
+    await fetch(`${JSONBLOB_BASE}/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch(e) {}
+}
+
+// ===== Conflict-free merge (preserve records from BOTH backends) =====
+// Transactions (inbound/outbound/stocktakes) are append-only with unique ids,
+// so a union by id never loses a record. Inventory lines are merged by
+// (brand|model|pattern|batch) keeping the most recently updated one.
+function _invKey(i) {
+  return [
+    (i.brand || '').trim(),
+    (i.model || '').trim(),
+    (i.pattern || '').trim(),
+    (i.batch || '').trim()
+  ].join('|').toLowerCase();
+}
+function _unionById(arrA, arrB) {
+  const m = new Map();
+  (arrA || []).forEach(x => { if (x && x.id) m.set(x.id, x); });
+  (arrB || []).forEach(x => {
+    if (!x || !x.id) return;
+    const ex = m.get(x.id);
+    if (!ex || (x.updatedAt || 0) >= (ex.updatedAt || 0)) m.set(x.id, x);
+  });
+  return [...m.values()];
+}
+function _unionInv(arrA, arrB) {
+  // Inventory rows carry a stable id. Merge by id (keep latest updatedAt) so that
+  // editing an item updates it in place across devices instead of creating a
+  // duplicate row when one of its display fields (brand/model/pattern/batch) changes.
+  return _unionById(arrA, arrB);
+}
+function mergeDBs(...dbs) {
+  const valid = dbs.filter(d => d && d.inventory);
+  if (valid.length === 0) return null;
+  if (valid.length === 1) return sanitizeDB(valid[0]);
+  let inv = valid[0].inventory, ib = valid[0].inbound,
+      ob = valid[0].outbound, st = valid[0].stocktakes, ts = valid[0].ts || 0;
+  for (let i = 1; i < valid.length; i++) {
+    const d = valid[i];
+    inv = _unionInv(inv, d.inventory);
+    ib = _unionById(ib, d.inbound);
+    ob = _unionById(ob, d.outbound);
+    st = _unionById(st, d.stocktakes);
+    ts = Math.max(ts, d.ts || 0);
+  }
+  return sanitizeDB({ inventory: inv, inbound: ib, outbound: ob, stocktakes: st, ts });
+}
+function sameDB(a, b) {
+  return (a.inventory || []).length === (b.inventory || []).length &&
+         (a.inbound || []).length === (b.inbound || []).length &&
+         (a.outbound || []).length === (b.outbound || []).length &&
+         (a.stocktakes || []).length === (b.stocktakes || []).length &&
+         (a.ts || 0) === (b.ts || 0);
+}
+
+async function syncGet() {
+  if (_cloudMode && !_serverMode) {
+    // Cloud-only: poll jsonblob
+    return await fetchCloudData();
+  } else if (_serverMode && !_cloudMode) {
+    // Local server only: poll LAN server
+    return await fetchServerData();
+  } else if (_serverMode && _cloudMode) {
+    // Dual mode: consult BOTH cloud and local server, apply whichever is newer,
+    // and converge the lagging backend so every device stays in sync.
+    const [srv, cld] = await Promise.all([fetchServerData(), fetchCloudData()]);
+    if (!srv && !cld) return null;
+    if (srv && !cld) return srv;
+    if (cld && !srv) { convergeToServer(cld.data); return cld; }
+    if (cld.ts > srv.ts) { convergeToServer(cld.data); return cld; }
+    if (srv.ts > cld.ts) { convergeToCloud(srv.data); return srv; }
+    return srv; // equal
+  }
+  return null;
+}
+
+async function syncSet(data) {
+  data = sanitizeDB(data);
+  if (_cloudMode && !_serverMode) {
+    // Cloud-only mode
+    return await cloudPush(data);
+  } else if (_serverMode && _cloudMode) {
+    // Dual mode: push to local server first, then cloud
+    let serverTs = false;
+    try {
+      const resp = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (resp.ok) {
+        const result = await resp.json();
+        serverTs = result.ts || Date.now();
+      }
+    } catch(e) {}
+    // Then push to cloud (don't block on failure)
+    try { await cloudPush(data); } catch(e) {}
+    return serverTs || (data.ts || Date.now());
+  } else {
+    // Server-only mode
+    const resp = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (resp.ok) {
+      const result = await resp.json();
+      return result.ts || Date.now();
+    }
+    return false;
+  }
+}
+
+async function loadDB() {
+  // Check for blob ID from URL hash or localStorage first
+  let blobId = getBlobId();
+
+  // If no blob ID from hash/localStorage, try fetching from server config
+  // (LAN server is the source of truth when reachable)
+  if (!blobId) {
+    try {
+      const resp = await fetch('/api/blob-id', { cache: 'no-store' });
+      if (resp.ok) {
+        const result = await resp.json();
+        if (result.blobId && result.blobId.length > 10) {
+          setBlobId(result.blobId);
+          blobId = result.blobId;
+        }
+      }
+    } catch(e) {}
+  }
+
+  // Fallback: use the baked-in shared blob ID (static CloudStudio host has no
+  // /api/blob-id endpoint, so cross-network visitors need this default to sync)
+  if (!blobId && DEFAULT_BLOB_ID) {
+    setBlobId(DEFAULT_BLOB_ID);
+    blobId = DEFAULT_BLOB_ID;
+  }
+
+  const hasCloudConfig = !!blobId;
+
+  // Step 1: Try local server
+  let serverReachable = false;
+  try {
+    const resp = await fetch('/api/data', { cache: 'no-store' });
+    if (resp.ok) {
+      const ct = resp.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        const result = await resp.json();
+        if (result.data && result.data.inventory) {
+          serverReachable = true;
+        if (result.data.inventory.length > 0) {
+          _serverMode = true;
+          _lastSyncTs = result.ts || 0;
+          // Enable cloud mode too if blob ID exists (dual-push for sharing)
+          if (hasCloudConfig) {
+            _cloudMode = true;
+            // Merge any cloud-only records into the loaded data instead of
+            // blindly overwriting the cloud (which would drop a phone's inbound)
+            let loaded = result.data;
+            const cloudData = await cloudFetch();
+            if (cloudData && cloudData.inventory) {
+              loaded = mergeDBs(result.data, cloudData) || result.data;
+            }
+            db = loaded;
+            _lastSyncTs = loaded.ts || _lastSyncTs;
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
+            // Converge both backends to the merged truth
+            convergeToServer(loaded);
+            convergeToCloud(loaded);
+          } else {
+            db = result.data;
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
+          }
+          _saveCount = 0;
+          _pushedCount = 0;
+          startSyncPoll();
+          return;
+        }
+        }
+      }
+    }
+  } catch(e) { /* server not reachable */ }
+
+  // Step 2: Load from localStorage
+  let hasLocalData = false;
+  try {
+    const raw = localStorage.getItem(DB_KEY);
+    if (raw) { db = JSON.parse(raw); hasLocalData = db.inventory && db.inventory.length > 0; }
+  } catch(e) {}
+
+  // Step 3: If no local server, try cloud sync (jsonblob)
+  if (!serverReachable) {
+    if (blobId) {
+      const cloudData = await cloudFetch();
+      if (cloudData && cloudData.inventory) {
+        // Merge local edits with cloud data — never drop either side
+        const merged = (hasLocalData ? mergeDBs(db, cloudData) : cloudData) || cloudData;
+        db = merged;
+        _lastSyncTs = merged.ts || 0;
+        _cloudMode = true;
+        _saveCount = 0;
+        _pushedCount = 0;
+        localStorage.setItem(DB_KEY, JSON.stringify(db));
+        // Push merged truth back so the cloud also has local-only records
+        await cloudPush(merged);
+        startSyncPoll();
+        return;
+      }
+    }
+    // No cloud data, try to create blob from local data
+    if (hasLocalData) {
+      _cloudMode = true;
+      _saveCount = 0;
+      _pushedCount = 0;
+      db.ts = Date.now();
+      localStorage.setItem(DB_KEY, JSON.stringify(db));
+      await cloudPush(db);
+      startSyncPoll();
+      return;
+    }
+  }
+
+  // Step 4: Server reachable but empty — push local data
+  if (serverReachable) {
+    _serverMode = true;
+    if (hasCloudConfig) {
+      _cloudMode = true;
+      db.ts = Date.now();
+      cloudPush(db).catch(() => {});
+    }
+    _saveCount = 0;
+    _pushedCount = 0;
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+    pushToServer();
+    startSyncPoll();
+    return;
+  }
+
+  // Step 5: No data anywhere — seed and enable cloud sync if no local server
+  if (!hasLocalData) {
+    seedData();
+  }
+  // If no local server available, enable cloud mode so data syncs across devices
+  if (!serverReachable) {
+    _cloudMode = true;
+    _saveCount = 0;
+    _pushedCount = 0;
+    db.ts = Date.now();
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+    await cloudPush(db);
+    startSyncPoll();
+  }
+}
+
+function saveDB() {
+  localStorage.setItem(DB_KEY, JSON.stringify(sanitizeDB(db)));
+  if (_serverMode || _cloudMode) {
+    _saveCount++;
+    pushToServer();
+  }
+}
+
+// Push local data to sync backend (debounced)
+let _pushTimer = null;
+function pushToServer() {
+  if (!_serverMode && !_cloudMode) return;
+  clearTimeout(_pushTimer);
+  _pushTimer = setTimeout(async () => {
+    const count = _saveCount;
+    if (_cloudMode) db.ts = Date.now();
+    const result = await syncSet(db);
+    if (result !== false) {
+      _lastSyncTs = (typeof result === 'number') ? result : (db.ts || Date.now());
+      _pushedCount = count;
+    }
+    // If new saves happened during push, push again
+    if (_saveCount > _pushedCount) pushToServer();
+  }, 300);
+}
+
+// Poll sync backend for updates from other devices
+function startSyncPoll() {
+  const interval = _cloudMode ? 5000 : 3000; // 5s for cloud, 3s for local
+  setInterval(async () => {
+    if (_syncing || (!_serverMode && !_cloudMode) || _saveCount > _pushedCount) return;
+    try {
+      if (_serverMode && _cloudMode) {
+        // Dual mode: merge local + server + cloud so a record that exists on
+        // only ONE backend (e.g. a phone's cloud-only inbound) is never lost.
+        const [srv, cld] = await Promise.all([fetchServerData(), fetchCloudData()]);
+        if (!srv && !cld) return;
+        const merged = mergeDBs(db, srv && srv.data, cld && cld.data);
+        if (!merged) return;
+        const changed = !sameDB(db, merged);
+        db = merged;
+        _lastSyncTs = merged.ts || _lastSyncTs;
+        localStorage.setItem(DB_KEY, JSON.stringify(db));
+        if (changed) {
+          // Converge both backends to the merged truth
+          if (_serverMode) convergeToServer(merged);
+          if (_cloudMode) convergeToCloud(merged);
+          renderCurrentView();
+          renderHeader();
+          renderSidebar();
+        }
+      } else {
+        // Single-source mode: safe to take the remote wholesale
+        const result = await syncGet();
+        if (!result || !result.data || !result.data.inventory) return;
+        const remoteTs = result.ts || 0;
+        if (remoteTs > _lastSyncTs) {
+          _syncing = true;
+          db = result.data;
+          _lastSyncTs = remoteTs;
+          localStorage.setItem(DB_KEY, JSON.stringify(db));
+          renderCurrentView();
+          renderHeader();
+          renderSidebar();
+          _syncing = false;
+        }
+      }
+    } catch(e) {}
+  }, interval);
+}
+
+function seedData() {
+  const now = Date.now();
+  const DAY = 86400000;
+  db.inventory = [
+    { id: uid(), brand: '米其林', model: 'PRIMACY 4', pattern: '对称花纹', batch: 'LOT-2024-A01', quantity: 45, createdAt: now, updatedAt: now },
+    { id: uid(), brand: '普利司通', model: 'TURANZA T005', pattern: '非对称花纹', batch: 'LOT-2024-B02', quantity: 32, createdAt: now, updatedAt: now },
+    { id: uid(), brand: '固特异', model: 'EAGLE F1 GSD3', pattern: '单导向花纹', batch: 'LOT-2024-C03', quantity: 8, createdAt: now, updatedAt: now },
+    { id: uid(), brand: '马牌', model: 'ContiPremiumContact 5', pattern: '非对称花纹', batch: 'LOT-2024-D04', quantity: 28, createdAt: now, updatedAt: now },
+    { id: uid(), brand: '倍耐力', model: 'P ZERO', pattern: '非对称花纹', batch: 'LOT-2024-E05', quantity: 15, createdAt: now, updatedAt: now },
+    { id: uid(), brand: '邓禄普', model: 'SP Sport MAXX 050', pattern: '对称花纹', batch: 'LOT-2024-F06', quantity: 5, createdAt: now, updatedAt: now },
+    { id: uid(), brand: '韩泰', model: 'Ventus S1 evo3', pattern: '非对称花纹', batch: 'LOT-2024-G07', quantity: 40, createdAt: now, updatedAt: now },
+    { id: uid(), brand: '朝阳', model: 'RP18 PLUS', pattern: '对称花纹', batch: 'LOT-2024-H08', quantity: 55, createdAt: now, updatedAt: now },
+  ];
+  db.inbound = [
+    { id: uid(), time: now - DAY, brandModel: '米其林 PRIMACY 4', pattern: '对称花纹', batch: 'LOT-2024-A01', quantity: 20, note: '', createdAt: now - DAY },
+    { id: uid(), time: now - 2*DAY, brandModel: '朝阳 RP18 PLUS', pattern: '对称花纹', batch: 'LOT-2024-B03', quantity: 30, note: '', createdAt: now - 2*DAY },
+    { id: uid(), time: now - 3*DAY, brandModel: '韩泰 Ventus S1 evo3', pattern: '非对称花纹', batch: 'LOT-2024-C07', quantity: 15, note: '补货', createdAt: now - 3*DAY },
+  ];
+  db.outbound = [
+    { id: uid(), time: now - 3600000, brandModel: '固特异 EAGLE F1 GSD3', pattern: '单导向花纹', batch: 'LOT-2024-D02', quantity: 12, note: '', createdAt: now - 3600000 },
+    { id: uid(), time: now - DAY - 3600000, brandModel: '邓禄普 SP Sport MAXX 050', pattern: '对称花纹', batch: 'LOT-2024-E05', quantity: 10, note: '', createdAt: now - DAY - 3600000 },
+    { id: uid(), time: now - 2*DAY - 3600000, brandModel: '倍耐力 P ZERO', pattern: '非对称花纹', batch: 'LOT-2024-F01', quantity: 7, note: '客户提货', createdAt: now - 2*DAY - 3600000 },
+  ];
+  db.stocktakes = [];
+  saveDB();
+}
+
+/* ===== Helpers ===== */
+function fmtNum(n) { return n.toLocaleString('zh-CN'); }
+
+function fmtDate(ts) {
+  const d = new Date(ts);
+  const Y = d.getFullYear(), M = d.getMonth() + 1, D = d.getDate();
+  return `${Y}年${M}月${D}日`;
+}
+
+function relTime(ts) {
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  const hr = Math.floor(diff / 3600000);
+  const day = Math.floor(diff / 86400000);
+  if (min < 1) return '刚刚';
+  if (min < 60) return min + '分钟前';
+  if (hr < 24) return hr + '小时前';
+  if (day < 7) return day + '天前';
+  return fmtDate(ts);
+}
+
+function stockLevel(qty) {
+  if (qty <= 8) return { cls: 'critical', color: 'red', text: '紧急' };
+  if (qty <= 15) return { cls: 'low', color: 'orange', text: '偏低' };
+  return { cls: 'ok', color: 'green', text: '充足' };
+}
+
+const BRAND_COLORS = ['#2F6BFF','#0FB5AE','#F5871F','#8B5CF6','#10B981','#06B6D4','#5B6BFF','#F4B400','#7C3AED','#0EA5E9'];
+const _brandColorCache = {};
+function brandColor(brand) {
+  if (_brandColorCache[brand]) return _brandColorCache[brand];
+  let hash = 0;
+  for (let i = 0; i < brand.length; i++) {
+    hash = ((hash << 5) - hash) + brand.charCodeAt(i);
+    hash |= 0;
+  }
+  const c = BRAND_COLORS[Math.abs(hash) % BRAND_COLORS.length];
+  _brandColorCache[brand] = c;
+  return c;
+}
+
+function findInvByBrandModel(bm, pattern) {
+  if (!bm) return null;
+  // Normalize by removing all spaces so "朝阳1号 265/45R21" and "朝阳1号265/45R21" match the same line
+  const normInput = bm.replace(/\s+/g, '').toLowerCase();
+  const pat = (pattern || '').trim().toLowerCase();
+  return db.inventory.find(i => {
+    const model = (!i.model || i.model === '-') ? '' : i.model;
+    const combined = `${i.brand}${model}`.replace(/\s+/g, '').toLowerCase();
+    if (combined !== normInput) return false;
+    // When a pattern is supplied, a distinct 花纹 must be a distinct inventory line
+    if (pat) {
+      const ip = (i.pattern || '').trim().toLowerCase();
+      return ip === pat;
+    }
+    return true;
+  });
+}
+
+function applyInbound(bm, qty, pattern, batch) {
+  const item = findInvByBrandModel(bm, pattern);
+  if (item) {
+    item.quantity += qty; item.updatedAt = Date.now();
+    if (pattern && !item.pattern) item.pattern = pattern;
+    if (batch && !item.batch) item.batch = batch;
+  }
+  else {
+    // Auto-create inventory item if it doesn't exist — split brand / model robustly
+    const [brand, model] = _splitBrandModel(bm);
+    const now = Date.now();
+    db.inventory.push({ id: uid(), brand, model, pattern: pattern || '', batch: batch || '', quantity: qty, createdAt: now, updatedAt: now });
+  }
+}
+function reverseInbound(bm, qty, pattern) {
+  const item = findInvByBrandModel(bm, pattern);
+  if (item) { item.quantity = Math.max(0, item.quantity - qty); item.updatedAt = Date.now(); }
+}
+function applyOutbound(bm, qty, pattern) {
+  const item = findInvByBrandModel(bm, pattern);
+  if (item) { item.quantity = Math.max(0, item.quantity - qty); item.updatedAt = Date.now(); }
+}
+function reverseOutbound(bm, qty, pattern) {
+  const item = findInvByBrandModel(bm, pattern);
+  if (item) { item.quantity += qty; item.updatedAt = Date.now(); }
+}
+
+function todayMovements() {
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const ts = todayStart.getTime();
+  return db.inbound.filter(r => r.time >= ts).length + db.outbound.filter(r => r.time >= ts).length;
+}
+
+/* ===== State ===== */
+let currentTab = 'inventory';
+let searchQuery = '';
+let brandFilter = '';   // exact brand selected from the stats card (kept separate from free-text search)
+let stocktakeData = null;
+
+/* ===== Tab Bar ===== */
+function renderTabBar() {
+  const tabs = [
+    { id:'inventory', label:'库存', icon:I.inventory },
+    { id:'inbound', label:'入库', icon:I.inbound },
+    { id:'outbound', label:'出库', icon:I.outbound },
+    { id:'stocktake', label:'盘存', icon:I.stocktake },
+  ];
+  document.getElementById('tabbar').innerHTML = tabs.map(t => `
+    <button class="tab ${currentTab===t.id?'active':''}" data-tab="${t.id}">
+      ${t.icon}<span>${t.label}</span>
+    </button>
+  `).join('');
+  document.querySelectorAll('.tab').forEach(el => {
+    el.addEventListener('click', () => switchTab(el.dataset.tab));
+  });
+}
+
+/* ===== Sidebar ===== */
+function renderSidebar() {
+  const tabs = [
+    { id:'inventory', label:'库存', icon:I.inventory },
+    { id:'inbound', label:'入库', icon:I.inbound },
+    { id:'outbound', label:'出库', icon:I.outbound },
+    { id:'stocktake', label:'盘存', icon:I.stocktake },
+  ];
+  const totalQty = db.inventory.reduce((s,i) => s + i.quantity, 0);
+  const lowCount = db.inventory.filter(i => i.quantity <= 15).length;
+  const moves = todayMovements();
+  document.getElementById('sidebar').innerHTML = `
+    <div class="sidebar-logo">
+      <div class="logo-icon" style="color:#5856D6">${TIRE_ICON}</div>
+      <span class="logo-text">Meilun Tire</span>
+    </div>
+    <nav class="sidebar-nav">
+      ${tabs.map(t => `
+        <div class="sidebar-item ${currentTab===t.id?'active':''}" data-tab="${t.id}">
+          ${t.icon}<span>${t.label}</span>
+        </div>
+      `).join('')}
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-stat"><span>总品类</span><b>${db.inventory.length}</b></div>
+      <div class="sidebar-stat"><span>总库存</span><b>${fmtNum(totalQty)}</b></div>
+      <div class="sidebar-stat"><span>低库存</span><b style="color:${lowCount>0?'var(--orange)':'var(--text)'}">${lowCount}</b></div>
+      <div class="sidebar-stat"><span>今日变动</span><b>${moves}</b></div>
+      <div class="sidebar-sync">${
+        (_serverMode && _cloudMode) ? '⇄☁ 局域网+云同步' :
+        _cloudMode ? '☁ 云同步' :
+        _serverMode ? '⇄ 局域网同步' :
+        '⊘ 本地模式'
+      }</div>
+    </div>
+  `;
+  document.querySelectorAll('.sidebar-item').forEach(el => {
+    el.addEventListener('click', () => switchTab(el.dataset.tab));
+  });
+}
+
+/* ===== Header ===== */
+const TIRE_ICON = `<svg viewBox="0 0 48 48" fill="none">
+  <circle cx="24" cy="24" r="22" fill="#1a1a2e"/>
+  <circle cx="24" cy="24" r="22" stroke="#3a3a5c" stroke-width="0.8" stroke-dasharray="1.5 1.5"/>
+  <circle cx="24" cy="24" r="17.5" stroke="currentColor" stroke-width="2.5"/>
+  <circle cx="24" cy="24" r="13" fill="#f5f5fa"/>
+  <g stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none">
+    <line x1="24" y1="13" x2="24" y2="35"/>
+    <line x1="13" y1="24" x2="35" y2="24"/>
+    <line x1="16.5" y1="16.5" x2="31.5" y2="31.5"/>
+    <line x1="31.5" y1="16.5" x2="16.5" y2="31.5"/>
+  </g>
+  <circle cx="24" cy="24" r="4.5" fill="#1a1a2e"/>
+  <circle cx="24" cy="24" r="2" fill="currentColor"/>
+</svg>`;
+
+// Outline-only tire used for decorative stickers (tints via currentColor)
+const TIRE_DECO = `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+  <circle cx="24" cy="24" r="21"/>
+  <circle cx="24" cy="24" r="14"/>
+  <circle cx="24" cy="24" r="4.5"/>
+  <g stroke-width="2.5" stroke-linecap="round">
+    <line x1="24" y1="10" x2="24" y2="38"/>
+    <line x1="10" y1="24" x2="38" y2="24"/>
+    <line x1="14" y1="14" x2="34" y2="34"/>
+    <line x1="34" y1="14" x2="14" y2="34"/>
+  </g>
+</svg>`;
+
+function renderHeader() {
+  const totalQty = db.inventory.reduce((s,i) => s + i.quantity, 0);
+  const titles = {
+    inventory: { title:'轮胎库存', stats:[`${db.inventory.length} 品类`, `${fmtNum(totalQty)} 条库存`] },
+    inbound:   { title:'入库记录', stats:[`${db.inbound.length} 条记录`] },
+    outbound:  { title:'出库记录', stats:[`${db.outbound.length} 条记录`] },
+    stocktake: { title:'盘存管理', stats:[`${db.stocktakes.length} 次盘存`] },
+  };
+  const t = titles[currentTab];
+  const statsHtml = t.stats.map((s,i) =>
+    i > 0 ? `<span class="header-sep">·</span><span class="header-stat">${s}</span>` : `<span class="header-stat">${s}</span>`
+  ).join('');
+  document.getElementById('header').innerHTML = `
+    <div class="header-deco">${TIRE_DECO}</div>
+    <div class="header-row">
+      <div class="header-info">
+        <div class="header-icon">${TIRE_ICON}</div>
+        <div>
+          <div class="header-title">${t.title}</div>
+          <div class="header-sub">${statsHtml}</div>
+        </div>
+      </div>
+      <button class="header-btn" onclick="doRefresh()" aria-label="刷新">${I.refresh}</button>
+    </div>
+  `;
+}
+
+function handleAdd() {
+  if (currentTab === 'inventory') showInventoryForm();
+  else if (currentTab === 'inbound') showInboundForm();
+  else if (currentTab === 'outbound') showOutboundForm();
+  else if (currentTab === 'stocktake') startStocktake();
+}
+
+// Manual refresh: pull the latest from server/cloud and merge into the current
+// db (preserving any local edits that haven't synced yet), then re-render.
+async function doRefresh() {
+  const btn = document.querySelector('.header-btn');
+  if (btn) btn.classList.add('spinning');
+  try {
+    const d = await syncGet();
+    if (d && d.data) {
+      db = mergeDBs(db, d.data) || db;
+      saveDB();
+    }
+    renderTabBar(); renderSidebar(); renderHeader(); renderCurrentView();
+    toast('已刷新');
+  } catch (e) {
+    toast('刷新失败');
+  } finally {
+    if (btn) setTimeout(() => btn.classList.remove('spinning'), 400);
+  }
+}
+
+/* ===== Switch Tab ===== */
+const TAB_COLORS = {
+  inventory: { accent:'#2F6BFF', light:'rgba(47,107,255,0.14)', grad:'linear-gradient(135deg,#5B8CFF 0%,#2F6BFF 100%)', shadow:'0 12px 30px rgba(47,107,255,0.36)' },
+  inbound:   { accent:'#0FB5AE', light:'rgba(15,181,174,0.14)', grad:'linear-gradient(135deg,#3FD9D0 0%,#0E9C96 100%)', shadow:'0 12px 30px rgba(15,181,174,0.38)' },
+  outbound:  { accent:'#F5871F', light:'rgba(245,135,31,0.15)', grad:'linear-gradient(135deg,#FFB259 0%,#F2730E 100%)', shadow:'0 12px 30px rgba(245,135,31,0.40)'},
+  stocktake: { accent:'#8B5CF6', light:'rgba(139,92,246,0.15)', grad:'linear-gradient(135deg,#B794FF 0%,#7A3DF0 100%)', shadow:'0 12px 30px rgba(139,92,246,0.40)' },
+};
+function setAccent(tab) {
+  const c = TAB_COLORS[tab] || TAB_COLORS.inventory;
+  const app = document.getElementById('app');
+  app.style.setProperty('--accent', c.accent);
+  app.style.setProperty('--accent-light', c.light);
+  app.style.setProperty('--accent-grad', c.grad);
+  app.style.setProperty('--accent-shadow', c.shadow);
+  const fab = document.querySelector('.fab');
+  if (fab) fab.style.background = c.accent;
+}
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + tab).classList.add('active');
+  setAccent(tab);
+  renderTabBar();
+  renderSidebar();
+  renderHeader();
+  renderCurrentView();
+  document.getElementById('main').scrollTop = 0;
+}
+
+function renderCurrentView() {
+  if (currentTab === 'inventory') renderInventory();
+  else if (currentTab === 'inbound') renderInbound();
+  else if (currentTab === 'outbound') renderOutbound();
+  else if (currentTab === 'stocktake') renderStocktake();
+}
+
+/* ===== Inventory View ===== */
+function computeBrandStats() {
+  const map = {};
+  db.inventory.forEach(i => {
+    const b = (i.brand && i.brand.trim()) || '未命名';
+    if (!map[b]) map[b] = { qty: 0, lines: 0 };
+    map[b].qty += (i.quantity || 0);
+    map[b].lines += 1;
+  });
+  return Object.keys(map).map(b => ({ brand: b, qty: map[b].qty, lines: map[b].lines }))
+    .sort((a, b) => b.qty - a.qty || a.brand.localeCompare(b.brand));
+}
+
+function brandStatsHtml() {
+  const stats = computeBrandStats();
+  if (stats.length === 0) return '';
+  const totalQty = stats.reduce((s, x) => s + x.qty, 0);
+  // "全部" card: clears the brand filter and shows every inventory row
+  const allCard = `
+    <div class="brand-stat${brandFilter===''?' active':''}" data-brand="__ALL__" onclick="filterByBrand(this)" style="--c:var(--accent)">
+      <span class="bs-brand">全部</span>
+      <span class="bs-qty">${fmtNum(totalQty)}<i>条</i></span>
+    </div>`;
+  const chips = stats.map(s => {
+    const c = brandColor(s.brand);
+    return `
+    <div class="brand-stat" data-brand="${s.brand}" onclick="filterByBrand(this)" style="--c:${c};border-left:3px solid ${c}">
+      <span class="bs-brand">${s.brand}</span>
+      <span class="bs-qty">${fmtNum(s.qty)}<i>条</i></span>
+    </div>`;
+  }).join('');
+  return `
+    <div class="brand-stats-head">
+      <span class="brand-stats-title">品牌库存统计</span>
+      <span class="brand-stats-total">共 ${fmtNum(totalQty)} 条 · ${stats.length} 个品牌（点击筛选）</span>
+    </div>
+    <div class="brand-stats-grid">${allCard}${chips}</div>
+  `;
+}
+
+function filterByBrand(el) {
+  const b = el.getAttribute('data-brand') || '';
+  // "全部" card, or clicking the active brand again, clears the filter
+  if (b === '__ALL__' || brandFilter === b) { clearBrandFilter(); return; }
+  brandFilter = b;
+  searchQuery = '';
+  const si = document.getElementById('search-input');
+  if (si) si.value = '';
+  const sc = document.getElementById('search-clear');
+  if (sc) sc.classList.remove('show');
+  document.querySelectorAll('.brand-stat').forEach(c => c.classList.toggle('active', c.getAttribute('data-brand') === b));
+  updateInventoryList();
+}
+
+function clearBrandFilter() {
+  brandFilter = '';
+  document.querySelectorAll('.brand-stat').forEach(c => c.classList.toggle('active', c.getAttribute('data-brand') === '__ALL__'));
+  updateInventoryList();
+}
+
+function renderInventory() {
+  const view = document.getElementById('view-inventory');
+
+  let html = `
+    <div class="search-wrap">
+      <div class="search-bar">
+        ${I.search}
+        <input type="text" id="search-input" placeholder="搜索品牌、型号、花纹、批次（直接输入2055516可搜205/55R16）" value="${searchQuery}">
+        <button class="search-clear ${searchQuery?'show':''}" id="search-clear">${I.clear}</button>
+      </div>
+    </div>
+    <div id="inv-brand-stats"></div>
+    <div id="inv-list-container"></div>
+  `;
+  view.innerHTML = html;
+
+  const bs = document.getElementById('inv-brand-stats');
+  if (bs) bs.innerHTML = brandStatsHtml();
+  // Highlight the active filter chip ("全部" when no brand filter is applied)
+  const activeBrand = brandFilter || '__ALL__';
+  document.querySelectorAll('.brand-stat').forEach(c => c.classList.toggle('active', c.getAttribute('data-brand') === activeBrand));
+
+  const si = document.getElementById('search-input');
+  if (si) {
+    si.addEventListener('input', e => {
+      searchQuery = e.target.value;
+      if (searchQuery) clearBrandFilter();
+      document.getElementById('search-clear').classList.toggle('show', !!searchQuery);
+      updateInventoryList();
+    });
+  }
+  const sc = document.getElementById('search-clear');
+  if (sc) {
+    sc.addEventListener('click', () => {
+      searchQuery = '';
+      clearBrandFilter();
+      document.getElementById('search-input').value = '';
+      document.getElementById('search-clear').classList.remove('show');
+      updateInventoryList();
+    });
+  }
+
+  updateInventoryList();
+}
+
+function updateInventoryList() {
+  const container = document.getElementById('inv-list-container');
+  if (!container) return;
+
+  function tireSizeKey(item) {
+    const m = (item.model || '').match(/(\d{3})\/(\d{2,3})R(\d{2,3})/);
+    if (m) return [parseInt(m[1]), parseInt(m[2]), parseInt(m[3]), item.pattern || ''];
+    const n = (item.model || item.brand || '').match(/(\d{3})/);
+    return [n ? parseInt(n[1]) : 9999, 0, 0, item.pattern || ''];
+  }
+  let list = [...db.inventory].sort((a, b) => {
+    const ka = tireSizeKey(a), kb = tireSizeKey(b);
+    return ka[0]-kb[0] || ka[1]-kb[1] || ka[2]-kb[2] || ka[3].localeCompare(kb[3]);
+  });
+  if (brandFilter) {
+    // Exact brand match (e.g. clicking "朝阳" must NOT pull in "朝阳1号")
+    list = list.filter(i => (i.brand && i.brand.trim()) === brandFilter);
+  } else if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    const qDigits = q.replace(/\D/g, '');
+    list = list.filter(i => {
+      const hay = (i.brand + ' ' + i.model + ' ' + (i.pattern||'') + ' ' + (i.batch||'')).toLowerCase();
+      if (hay.includes(q)) return true;
+      if (qDigits && qDigits.length >= 3) {
+        const hayDigits = hay.replace(/\D/g, '');
+        if (hayDigits.includes(qDigits)) return true;
+      }
+      return false;
+    });
+  }
+
+  let html = '';
+  if (list.length === 0) {
+    html += `
+      <div class="empty-state">
+        ${I.box}
+        <p>${searchQuery ? '没有找到匹配的轮胎' : '暂无库存数据<br>点击右上角 + 添加'}</p>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="inv-section-label">
+        <span class="label">库存清单</span>
+        <span class="count">${list.length} 项</span>
+      </div>
+      <div class="inv-list">
+        <div class="inv-group">
+          <div class="inv-head">
+            <span class="h-dot"></span>
+            <span class="h-brand">品牌型号</span>
+            <span class="h-pattern">花纹</span>
+            <span class="h-qty">数量</span>
+            <span class="h-batch">批次</span>
+          </div>
+    `;
+    list.forEach(item => {
+      const modelText = (!item.model || item.model === '-') ? '' : item.model;
+      const displayText = modelText ? `${item.brand} ${modelText}` : item.brand;
+      html += `
+        <div class="inv-row" onclick="showInventoryForm('${item.id}')">
+          <div class="inv-dot" style="background:${brandColor(item.brand)}"></div>
+          <span class="inv-brand-model">${displayText}</span>
+          <span class="inv-pattern ${item.pattern?'':'empty'}">${item.pattern||''}</span>
+          <span class="inv-qty">${fmtNum(item.quantity)}</span>
+          <span class="inv-batch ${item.batch?'':'empty'}">${item.batch||''}</span>
+        </div>
+      `;
+    });
+    html += '</div></div>';
+  }
+  container.innerHTML = html;
+}
+
+/* ===== Inbound View ===== */
+// Safe label that never renders the literal "undefined": prefer brandModel,
+// fall back to brand + model, then to whatever single field exists.
+function bmOf(r) {
+  if (!r) return '';
+  const bm = r.brandModel;
+  if (bm && bm !== 'undefined') return bm;
+  const b = r.brand || '', m = r.model || '';
+  if (b || m) return (b + ' ' + m).trim();
+  return '';
+}
+function renderInbound() {
+  const view = document.getElementById('view-inbound');
+  const list = [...db.inbound].sort((a,b) => b.time - a.time);
+
+  if (list.length === 0) {
+    view.innerHTML = `
+      <div class="empty-state">
+        ${I.inbound}
+        <p>暂无入库记录<br>点击右上角 + 添加</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `
+    <div class="inv-section-label">
+      <span class="label">入库记录</span>
+      <span class="count">${list.length} 条</span>
+    </div>
+    <div class="record-list"><div class="rec-group">
+  `;
+  list.forEach(r => {
+    html += `
+      <div class="rec-row in">
+        <div class="rec-dot in"></div>
+        <div class="rec-info">
+          <div class="rec-name-line">
+            <span class="rec-brand-model">${bmOf(r)}</span>
+            ${r.pattern ? `<span class="rec-pattern">${r.pattern}</span>` : ''}
+          </div>
+          <div class="rec-time">${fmtDate(r.time)}${r.batch ? ' · 批次 ' + r.batch : ''}${r.note ? ' · ' + r.note : ''}</div>
+        </div>
+        <div class="rec-qty in">+${fmtNum(r.quantity)}</div>
+        <div class="rec-actions">
+          <button class="btn-edit" onclick="showInboundForm('${r.id}')">${I.edit}</button>
+          <button class="btn-delete" onclick="confirmDelete('确认删除该入库记录？','将同时回退库存数量',()=>deleteInbound('${r.id}'))">${I.trash}</button>
+        </div>
+      </div>
+    `;
+  });
+  html += '</div></div>';
+  view.innerHTML = html;
+}
+
+/* ===== Outbound View ===== */
+function renderOutbound() {
+  const view = document.getElementById('view-outbound');
+  const list = [...db.outbound].sort((a,b) => b.time - a.time);
+
+  if (list.length === 0) {
+    view.innerHTML = `
+      <div class="empty-state">
+        ${I.outbound}
+        <p>暂无出库记录<br>点击右上角 + 添加</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `
+    <div class="inv-section-label">
+      <span class="label">出库记录</span>
+      <span class="count">${list.length} 条</span>
+    </div>
+    <div class="record-list"><div class="rec-group">
+  `;
+  list.forEach(r => {
+    html += `
+      <div class="rec-row out">
+        <div class="rec-dot out"></div>
+        <div class="rec-info">
+          <div class="rec-name-line">
+            <span class="rec-brand-model">${bmOf(r)}</span>
+            ${r.pattern ? `<span class="rec-pattern">${r.pattern}</span>` : ''}
+          </div>
+          <div class="rec-time">${fmtDate(r.time)}${r.batch ? ' · 批次 ' + r.batch : ''}${r.note ? ' · ' + r.note : ''}</div>
+        </div>
+        <div class="rec-qty out">-${fmtNum(r.quantity)}</div>
+        <div class="rec-actions">
+          <button class="btn-edit" onclick="showOutboundForm('${r.id}')">${I.edit}</button>
+          <button class="btn-delete" onclick="confirmDelete('确认删除该出库记录？','将同时恢复库存数量',()=>deleteOutbound('${r.id}'))">${I.trash}</button>
+        </div>
+      </div>
+    `;
+  });
+  html += '</div></div>';
+  view.innerHTML = html;
+}
+
+/* ===== Stocktake View ===== */
+function renderStocktake() {
+  const view = document.getElementById('view-stocktake');
+  const list = [...db.stocktakes].sort((a,b) => b.time - a.time);
+
+  let html = `
+    <div class="stocktake-start" onclick="startStocktake()">
+      ${I.clipboard}
+      <h3>开始盘存</h3>
+      <p>核对实际库存与系统数据</p>
+    </div>
+  `;
+
+  if (list.length === 0) {
+    html += `
+      <div class="empty-state">
+        ${I.chart}
+        <p>暂无盘存记录</p>
+      </div>
+    `;
+  } else {
+    html += '<div class="record-list">';
+    list.forEach(s => {
+      const diffCount = s.items.filter(i => i.diff !== 0).length;
+      html += `
+        <div class="stocktake-card">
+          <div class="st-top">
+            <div class="st-date">${fmtDate(s.time)}</div>
+            <div class="st-badge ${diffCount > 0 ? 'warn' : 'ok'}">${diffCount > 0 ? diffCount + ' 项差异' : '全部一致'}</div>
+          </div>
+          <div class="st-summary">共盘存 ${s.items.length} 项 · ${diffCount > 0 ? diffCount + ' 项存在差异' : '库存完全匹配'}</div>
+          <div class="st-detail" id="st-detail-${s.id}">
+            ${s.items.map(i => `
+              <div class="st-detail-item">
+                <span>${i.brandModel}</span>
+                <span>系统 ${i.systemQty} · 实际 ${i.actualQty} · <span class="${i.diff===0?'diff-ok':'diff-bad'}">${i.diff>0?'+':''}${i.diff}</span></span>
+              </div>
+            `).join('')}
+          </div>
+          <div class="st-actions">
+            <button class="btn-edit" onclick="toggleStDetail('${s.id}')">查看详情</button>
+            <button class="btn-delete" onclick="confirmDelete('确认删除该盘存记录？','删除后不可恢复',()=>deleteStocktake('${s.id}'))">${I.trash} 删除</button>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+  }
+
+  view.innerHTML = html;
+}
+
+function toggleStDetail(id) {
+  const el = document.getElementById('st-detail-' + id);
+  if (el) el.classList.toggle('show');
+}
+
+/* ===== Inventory Form ===== */
+function showInventoryForm(id) {
+  const item = id ? db.inventory.find(i => i.id === id) : null;
+  const isEdit = !!item;
+
+  showSheet(`
+    <div class="sheet-title">${isEdit ? '编辑库存' : '新增库存'}</div>
+    <div class="form-group">
+      <div class="form-row"><label>品牌型号</label><input id="f-brandmodel" placeholder="如：米其林 PRIMACY 4" value="${item?(item.model&&item.model!=='-'?item.brand+' '+item.model:item.brand):''}"></div>
+      <div class="form-row"><label>花纹</label><input id="f-pattern" placeholder="如：对称花纹" value="${item?item.pattern:''}"></div>
+      <div class="form-row"><label>批次</label><input id="f-batch" placeholder="如：LOT-2024-A01" value="${item?item.batch:''}"></div>
+      <div class="form-row"><label>数量</label><input id="f-qty" type="number" min="0" placeholder="0" value="${item?item.quantity:''}"></div>
+    </div>
+    <button class="btn-primary" onclick="saveInventory('${id||''}')">保存</button>
+    <button class="btn-secondary" onclick="hideSheet()">取消</button>
+    ${isEdit ? `<button class="btn-danger-text" onclick="hideSheet();confirmDelete('确认删除该库存项？','删除后不可恢复',()=>deleteInventory('${id}'))">删除该库存项</button>` : ''}
+  `);
+}
+
+function saveInventory(id) {
+  const bm = document.getElementById('f-brandmodel').value.trim();
+  const parts = bm.split(/\s+/);
+  const brand = parts[0] || '';
+  const model = parts.slice(1).join(' ') || '';
+  const pattern = document.getElementById('f-pattern').value.trim();
+  const batch = document.getElementById('f-batch').value.trim();
+  const qty = parseInt(document.getElementById('f-qty').value) || 0;
+
+  if (!bm) { toast('请输入品牌型号'); return; }
+  if (qty < 0) { toast('数量不能为负'); return; }
+
+  if (id) {
+    const item = db.inventory.find(i => i.id === id);
+    if (item) {
+      item.brand = brand; item.model = model; item.pattern = pattern;
+      item.batch = batch; item.quantity = qty; item.updatedAt = Date.now();
+    }
+    toast('已更新');
+  } else {
+    db.inventory.push({ id: uid(), brand, model, pattern, batch, quantity: qty, createdAt: Date.now(), updatedAt: Date.now() });
+    toast('已添加');
+  }
+  saveDB();
+  hideSheet();
+  renderCurrentView();
+  renderHeader();
+}
+
+function deleteInventory(id) {
+  db.inventory = db.inventory.filter(i => i.id !== id);
+  saveDB();
+  renderCurrentView();
+  renderHeader();
+  toast('已删除');
+}
+
+/* ===== Inbound Form ===== */
+function showInboundForm(id) {
+  const rec = id ? db.inbound.find(r => r.id === id) : null;
+  const isEdit = !!rec;
+  const now = new Date();
+  const defaultTime = rec ? new Date(rec.time) : now;
+  const timeStr = `${defaultTime.getFullYear()}-${String(defaultTime.getMonth()+1).padStart(2,'0')}-${String(defaultTime.getDate()).padStart(2,'0')}T${String(defaultTime.getHours()).padStart(2,'0')}:${String(defaultTime.getMinutes()).padStart(2,'0')}`;
+
+  const suggestions = db.inventory.map(i => `${i.brand} ${i.model}`);
+  const datalist = suggestions.map(s => `<option value="${s}">`).join('');
+  const patterns = [...new Set(db.inventory.map(i => i.pattern))];
+  const patternDatalist = patterns.map(p => `<option value="${p}">`).join('');
+  const batches = [...new Set(db.inventory.map(i => i.batch))];
+  const batchDatalist = batches.map(b => `<option value="${b}">`).join('');
+
+  showSheet(`
+    <div class="sheet-title">${isEdit ? '编辑入库' : '新增入库'}</div>
+    <div class="form-group">
+      <div class="form-row"><label>时间</label><input id="f-time" type="datetime-local" value="${timeStr}"></div>
+      <div class="form-row"><label>品牌型号</label><input id="f-bm" list="inv-list" placeholder="选择或输入" value="${rec?rec.brandModel:''}"><datalist id="inv-list">${datalist}</datalist></div>
+      <div class="form-row"><label>花纹</label><input id="f-pattern" list="pattern-list" placeholder="必填" value="${rec?(rec.pattern||''):''}"><datalist id="pattern-list">${patternDatalist}</datalist></div>
+      <div class="form-row"><label>批次</label><input id="f-batch" list="batch-list" placeholder="如：LOT-2024-A01" value="${rec?(rec.batch||''):''}"><datalist id="batch-list">${batchDatalist}</datalist></div>
+      <div class="form-row"><label>数量</label><input id="f-qty" type="number" min="1" placeholder="0" value="${rec?rec.quantity:''}"></div>
+      <div class="form-row"><label>备注</label><input id="f-note" placeholder="选填" value="${rec?(rec.note||''):''}"></div>
+    </div>
+    <button class="btn-primary" onclick="saveInbound('${id||''}')">保存</button>
+    <button class="btn-secondary" onclick="hideSheet()">取消</button>
+  `);
+
+  // Auto-fill pattern and batch when brand+model matches an inventory item
+  const bmInput = document.getElementById('f-bm');
+  if (bmInput) {
+    bmInput.addEventListener('change', () => {
+      const norm = bmInput.value.replace(/\s+/g, '').toLowerCase();
+      const match = db.inventory.find(i => `${i.brand}${i.model}`.replace(/\s+/g, '').toLowerCase() === norm);
+      if (match) {
+        document.getElementById('f-pattern').value = match.pattern;
+        document.getElementById('f-batch').value = match.batch;
+      }
+    });
+  }
+}
+
+function saveInbound(id) {
+  const timeVal = document.getElementById('f-time').value;
+  const bm = document.getElementById('f-bm').value.trim();
+  const pattern = document.getElementById('f-pattern').value.trim();
+  const batch = document.getElementById('f-batch').value.trim();
+  const qty = parseInt(document.getElementById('f-qty').value) || 0;
+  const note = document.getElementById('f-note').value.trim();
+  const time = timeVal ? new Date(timeVal).getTime() : Date.now();
+
+  if (!bm) { toast('请输入品牌型号'); return; }
+  if (!pattern) { toast('请输入花纹'); return; }
+  if (qty < 1) { toast('数量至少为 1'); return; }
+
+  if (id) {
+    const rec = db.inbound.find(r => r.id === id);
+    if (rec) {
+      reverseInbound(rec.brandModel, rec.quantity, rec.pattern);
+      rec.time = time; rec.brandModel = bm; rec.pattern = pattern; rec.batch = batch; rec.quantity = qty; rec.note = note;
+      applyInbound(bm, qty, pattern, batch);
+    }
+    toast('已更新');
+  } else {
+    db.inbound.push({ id: uid(), time, brandModel: bm, pattern, batch, quantity: qty, note, createdAt: Date.now() });
+    applyInbound(bm, qty, pattern, batch);
+    toast('入库成功');
+  }
+  saveDB();
+  hideSheet();
+  renderCurrentView();
+  renderHeader();
+}
+
+function deleteInbound(id) {
+  const rec = db.inbound.find(r => r.id === id);
+  if (rec) reverseInbound(rec.brandModel, rec.quantity, rec.pattern);
+  db.inbound = db.inbound.filter(r => r.id !== id);
+  saveDB();
+  renderCurrentView();
+  renderHeader();
+  toast('已删除');
+}
+
+/* ===== Outbound Form ===== */
+function showOutboundForm(id) {
+  const rec = id ? db.outbound.find(r => r.id === id) : null;
+  const isEdit = !!rec;
+  const now = new Date();
+  const defaultTime = rec ? new Date(rec.time) : now;
+  const timeStr = `${defaultTime.getFullYear()}-${String(defaultTime.getMonth()+1).padStart(2,'0')}-${String(defaultTime.getDate()).padStart(2,'0')}T${String(defaultTime.getHours()).padStart(2,'0')}:${String(defaultTime.getMinutes()).padStart(2,'0')}`;
+
+  const suggestions = db.inventory.map(i => `${i.brand} ${i.model}`);
+  const datalist = suggestions.map(s => `<option value="${s}">`).join('');
+  const patterns = [...new Set(db.inventory.map(i => i.pattern))];
+  const patternDatalist = patterns.map(p => `<option value="${p}">`).join('');
+  const batches = [...new Set(db.inventory.map(i => i.batch))];
+  const batchDatalist = batches.map(b => `<option value="${b}">`).join('');
+
+  showSheet(`
+    <div class="sheet-title">${isEdit ? '编辑出库' : '新增出库'}</div>
+    <div class="form-group">
+      <div class="form-row"><label>时间</label><input id="f-time" type="datetime-local" value="${timeStr}"></div>
+      <div class="form-row"><label>品牌型号</label><input id="f-bm" list="inv-list" placeholder="选择或输入" value="${rec?rec.brandModel:''}"><datalist id="inv-list">${datalist}</datalist></div>
+      <div class="form-row"><label>花纹</label><input id="f-pattern" list="pattern-list" placeholder="必填" value="${rec?(rec.pattern||''):''}"><datalist id="pattern-list">${patternDatalist}</datalist></div>
+      <div class="form-row"><label>批次</label><input id="f-batch" list="batch-list" placeholder="如：LOT-2024-A01" value="${rec?(rec.batch||''):''}"><datalist id="batch-list">${batchDatalist}</datalist></div>
+      <div class="form-row"><label>数量</label><input id="f-qty" type="number" min="1" placeholder="0" value="${rec?rec.quantity:''}"></div>
+      <div class="form-row"><label>备注</label><input id="f-note" placeholder="选填" value="${rec?(rec.note||''):''}"></div>
+    </div>
+    <button class="btn-primary" onclick="saveOutbound('${id||''}')">保存</button>
+    <button class="btn-secondary" onclick="hideSheet()">取消</button>
+  `);
+
+  // Auto-fill pattern and batch when brand+model matches an inventory item
+  const bmInput = document.getElementById('f-bm');
+  if (bmInput) {
+    bmInput.addEventListener('change', () => {
+      const norm = bmInput.value.replace(/\s+/g, '').toLowerCase();
+      const match = db.inventory.find(i => `${i.brand}${i.model}`.replace(/\s+/g, '').toLowerCase() === norm);
+      if (match) {
+        document.getElementById('f-pattern').value = match.pattern;
+        document.getElementById('f-batch').value = match.batch;
+      }
+    });
+  }
+}
+
+function saveOutbound(id) {
+  const timeVal = document.getElementById('f-time').value;
+  const bm = document.getElementById('f-bm').value.trim();
+  const pattern = document.getElementById('f-pattern').value.trim();
+  const batch = document.getElementById('f-batch').value.trim();
+  const qty = parseInt(document.getElementById('f-qty').value) || 0;
+  const note = document.getElementById('f-note').value.trim();
+  const time = timeVal ? new Date(timeVal).getTime() : Date.now();
+
+  if (!bm) { toast('请输入品牌型号'); return; }
+  if (!pattern) { toast('请输入花纹'); return; }
+  if (qty < 1) { toast('数量至少为 1'); return; }
+
+  if (id) {
+    const rec = db.outbound.find(r => r.id === id);
+    if (rec) {
+      reverseOutbound(rec.brandModel, rec.quantity, rec.pattern);
+      rec.time = time; rec.brandModel = bm; rec.pattern = pattern; rec.batch = batch; rec.quantity = qty; rec.note = note;
+      applyOutbound(bm, qty, pattern);
+    }
+    toast('已更新');
+  } else {
+    db.outbound.push({ id: uid(), time, brandModel: bm, pattern, batch, quantity: qty, note, createdAt: Date.now() });
+    applyOutbound(bm, qty, pattern);
+    toast('出库成功');
+  }
+  saveDB();
+  hideSheet();
+  renderCurrentView();
+  renderHeader();
+}
+
+function deleteOutbound(id) {
+  const rec = db.outbound.find(r => r.id === id);
+  if (rec) reverseOutbound(rec.brandModel, rec.quantity, rec.pattern);
+  db.outbound = db.outbound.filter(r => r.id !== id);
+  saveDB();
+  renderCurrentView();
+  renderHeader();
+  toast('已删除');
+}
+
+/* ===== Stocktake ===== */
+function startStocktake() {
+  if (db.inventory.length === 0) { toast('请先添加库存项'); return; }
+
+  stocktakeData = db.inventory.map(item => {
+    const modelText = (!item.model || item.model === '-') ? '' : item.model;
+    return {
+      inventoryId: item.id,
+      brandModel: modelText ? `${item.brand} ${modelText}` : item.brand,
+      systemQty: item.quantity,
+      actualQty: null,
+      diff: null
+    };
+  });
+
+  renderStocktakeScreen();
+}
+
+function renderStocktakeScreen() {
+  const screen = document.getElementById('stocktake-screen');
+  screen.classList.add('show');
+
+  let html = `
+    <div class="st-header">
+      <button class="cancel" onclick="cancelStocktake()">取消</button>
+      <h2>盘存中</h2>
+      <button class="done" onclick="finishStocktake()">完成</button>
+    </div>
+    <div class="st-body" id="st-body">
+  `;
+
+  stocktakeData.forEach((item, idx) => {
+    const diffText = item.actualQty !== null
+      ? (item.diff === 0 ? '✓ 一致' : (item.diff > 0 ? '+' + item.diff : String(item.diff)))
+      : '待盘点';
+    const diffClass = item.actualQty !== null
+      ? (item.diff === 0 ? 'match' : 'mismatch')
+      : '';
+    html += `
+      <div class="st-item">
+        <div class="st-item-top">
+          <div class="st-item-brand">${item.brandModel}</div>
+          <div class="st-item-sys">系统 ${item.systemQty}</div>
+        </div>
+        <div class="st-item-input-row">
+          <label>实际数量</label>
+          <input type="number" min="0" placeholder="输入实际数量" value="${item.actualQty !== null ? item.actualQty : ''}" oninput="updateStItem(${idx}, this.value)">
+          <div class="st-item-diff ${diffClass}">${diffText}</div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+  screen.innerHTML = html;
+}
+
+function updateStItem(idx, val) {
+  const item = stocktakeData[idx];
+  if (val === '') {
+    item.actualQty = null;
+    item.diff = null;
+  } else {
+    item.actualQty = parseInt(val) || 0;
+    item.diff = item.actualQty - item.systemQty;
+  }
+  // Update diff display
+  const items = document.querySelectorAll('#st-body .st-item');
+  const diffEl = items[idx].querySelector('.st-item-diff');
+  if (item.actualQty === null) {
+    diffEl.textContent = '待盘点';
+    diffEl.className = 'st-item-diff';
+  } else if (item.diff === 0) {
+    diffEl.textContent = '✓ 一致';
+    diffEl.className = 'st-item-diff match';
+  } else {
+    diffEl.textContent = (item.diff > 0 ? '+' : '') + item.diff;
+    diffEl.className = 'st-item-diff mismatch';
+  }
+}
+
+function cancelStocktake() {
+  stocktakeData = null;
+  document.getElementById('stocktake-screen').classList.remove('show');
+}
+
+function finishStocktake() {
+  const unchecked = stocktakeData.filter(i => i.actualQty === null);
+  if (unchecked.length > 0) {
+    confirmModal('有 ' + unchecked.length + ' 项未盘点', '未盘点的项将按系统数量记录，是否继续？', () => {
+      stocktakeData.forEach(i => {
+        if (i.actualQty === null) { i.actualQty = i.systemQty; i.diff = 0; }
+      });
+      saveStocktakeRecord();
+    });
+    return;
+  }
+  saveStocktakeRecord();
+}
+
+function saveStocktakeRecord() {
+  const record = {
+    id: uid(),
+    time: Date.now(),
+    items: stocktakeData.map(i => ({
+      brandModel: i.brandModel,
+      systemQty: i.systemQty,
+      actualQty: i.actualQty,
+      diff: i.diff
+    })),
+    note: ''
+  };
+  db.stocktakes.push(record);
+
+  // Update inventory quantities to match actual counts
+  stocktakeData.forEach(i => {
+    const inv = db.inventory.find(item => item.id === i.inventoryId);
+    if (inv && i.actualQty !== null) {
+      inv.quantity = i.actualQty;
+      inv.updatedAt = Date.now();
+    }
+  });
+
+  saveDB();
+  stocktakeData = null;
+  document.getElementById('stocktake-screen').classList.remove('show');
+  renderCurrentView();
+  renderHeader();
+  toast('盘存完成');
+}
+
+function deleteStocktake(id) {
+  db.stocktakes = db.stocktakes.filter(s => s.id !== id);
+  saveDB();
+  renderCurrentView();
+  renderHeader();
+  toast('已删除');
+}
+
+/* ===== Sheet ===== */
+function showSheet(html) {
+  document.getElementById('sheet').innerHTML = '<div class="sheet-handle"></div>' + html;
+  document.getElementById('sheet-overlay').classList.add('show');
+  document.getElementById('sheet').classList.add('show');
+}
+
+function hideSheet() {
+  document.getElementById('sheet-overlay').classList.remove('show');
+  document.getElementById('sheet').classList.remove('show');
+}
+
+/* ===== Modal ===== */
+let _pendingConfirm = null;
+
+function confirmModal(title, desc, onConfirm) {
+  _pendingConfirm = onConfirm;
+  const modal = document.getElementById('modal');
+  modal.innerHTML = `
+    <div class="modal-text">
+      <div class="modal-title">${title}</div>
+      <div class="modal-desc">${desc}</div>
+    </div>
+    <div class="modal-actions">
+      <button onclick="hideModal()">取消</button>
+      <button onclick="executeConfirm()">确认</button>
+    </div>
+  `;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function confirmDelete(title, desc, onConfirm) {
+  _pendingConfirm = onConfirm;
+  const modal = document.getElementById('modal');
+  modal.innerHTML = `
+    <div class="modal-text">
+      <div class="modal-title">${title}</div>
+      <div class="modal-desc">${desc}</div>
+    </div>
+    <div class="modal-actions">
+      <button onclick="hideModal()">取消</button>
+      <button onclick="executeConfirm()">删除</button>
+    </div>
+  `;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function executeConfirm() {
+  const cb = _pendingConfirm;
+  hideModal();
+  if (cb) cb();
+}
+
+function hideModal() {
+  _pendingConfirm = null;
+  document.getElementById('modal-overlay').classList.remove('show');
+}
+
+/* ===== Toast ===== */
+let toastTimer = null;
+function toast(msg, duration) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), duration || 2000);
+}
+
+/* ===== Init ===== */
+async function init() {
+  await loadDB();
+  // Debug: show sync status on load
+  const _dbgBlob = getBlobId();
+  console.log('[TireOS Debug] blobId:', _dbgBlob, 'serverMode:', _serverMode, 'cloudMode:', _cloudMode);
+  toast(`同步状态: ${_serverMode?'局域网✓':'局域网✗'} ${_cloudMode?'云同步✓':'云同步✗'} ${_dbgBlob?('Blob:'+_dbgBlob.slice(0,8)):'无Blob'}`, 5000);
+  // Migrate: clean up legacy model '-' values
+  let migrated = false;
+  db.inventory.forEach(i => { if (i.model === '-') { i.model = ''; migrated = true; } });
+  if (migrated) saveDB();
+  setAccent(currentTab);
+  renderTabBar();
+  renderSidebar();
+  renderHeader();
+  renderCurrentView();
+
+  // Populate the floating add button and decorative sticker icons
+  const _fab = document.getElementById('fab'); if (_fab) _fab.innerHTML = I.plus;
+  const _deco = document.getElementById('deco-sticker'); if (_deco) _deco.innerHTML = TIRE_DECO;
+
+  // Close sheet on overlay tap
+  document.getElementById('sheet-overlay').addEventListener('click', hideSheet);
+  // Close modal on overlay tap
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === e.currentTarget) hideModal();
+  });
+}
+
+init();
+</script>
+</body>
+</html>
