@@ -784,6 +784,13 @@ const I = {
 const DB_KEY = 'tireos_v1';
 const BLOB_ID_KEY = 'tireos_blob_id';
 const JSONBLOB_BASE = 'https://jsonblob.com/api/jsonBlob';
+// --- GitHub-backed cloud sync (live, cross-device, never reclaimed) ---
+const GH_OWNER = 'yanyan71';
+const GH_REPO = 'tireos';
+const GITHUB_RAW = 'https://raw.githubusercontent.com/' + GH_OWNER + '/' + GH_REPO + '/main/data.json';
+const GITHUB_API = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/data.json';
+const GITHUB_CLOUD = true; // use GitHub repo as the cloud data source
+function b64utf8(str){ return btoa(unescape(encodeURIComponent(str))); }
 // Shared cloud blob ID baked into the page so the static CloudStudio link works
 // cross-network without needing a #sync=... in the URL. The local LAN server's
 // /api/blob-id overrides this when reachable (source of truth on the LAN).
@@ -946,17 +953,15 @@ function sanitizeDB(d) {
 }
 
 async function cloudFetch() {
-  const id = getBlobId();
-  if (!id) return null;
+  // GitHub repo is the source of truth for cloud data
   try {
-    const resp = await fetch(`${JSONBLOB_BASE}/${id}`, {
-      headers: { 'Accept': 'application/json' },
-      cache: 'no-store'
-    });
-    if (!resp.ok) return null;
-    const raw = await resp.json();
-    return decompressFromCloud(raw);
-  } catch(e) { return null; }
+    const resp = await fetch(GITHUB_RAW + '?_=' + Date.now(), { cache: 'no-store' });
+    if (resp.ok) {
+      const raw = await resp.json();
+      if (raw && raw.data && raw.data.inventory) return raw.data;
+    }
+  } catch(e) {}
+  return null;
 }
 
 async function cloudCreate(data) {
@@ -984,29 +989,24 @@ async function cloudCreate(data) {
 
 async function cloudPush(data) {
   data = sanitizeDB(data);
-  const id = getBlobId();
-  const payload = compressForCloud(data);
-  if (!id) {
-    // No blob yet, create one
-    await cloudCreate(data);
-    return true;
-  }
+  // Front-end write needs a browser-stored PAT (optional, for editing from the
+  // public site). When absent, local edits are pushed by the LAN server instead.
+  const tok = (typeof localStorage !== 'undefined') ? (localStorage.getItem('gh_token') || '') : '';
+  if (!tok) return false;
   try {
-    const resp = await fetch(`${JSONBLOB_BASE}/${id}`, {
+    let sha;
+    try {
+      const g = await fetch(GITHUB_API, { headers: { 'Authorization': 'token ' + tok, 'Accept': 'application/vnd.github+json' }, cache: 'no-store' });
+      if (g.ok) sha = (await g.json()).sha;
+    } catch(e) {}
+    const content = b64utf8(JSON.stringify({ data, ts: data.ts || Date.now() }));
+    const resp = await fetch(GITHUB_API, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(payload)
+      headers: { 'Authorization': 'token ' + tok, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'TireOS update', content, sha })
     });
-    if (resp.ok) return true;
-    if (resp.status === 404) {
-      // Blob expired, create a new one
-      await cloudCreate(data);
-      return true;
-    }
-    return false;
-  } catch(e) {
-    return false;
-  }
+    return resp.ok;
+  } catch(e) { return false; }
 }
 
 // ===== Unified sync abstraction =====
@@ -1021,22 +1021,15 @@ async function fetchServerData() {
   return null;
 }
 async function fetchCloudData() {
-  const id = getBlobId();
-  if (id) {
-    try {
-      const resp = await fetch(`${JSONBLOB_BASE}/${id}`, {
-        headers: { 'Accept': 'application/json' }, cache: 'no-store'
-      });
-      if (resp.ok) {
-        const raw = await resp.json();
-        const d = decompressFromCloud(raw);
-        if (d && d.inventory) return { data: d, ts: d.ts || 0 };
-      }
-    } catch(e) {}
-  }
-  // Blob missing / reclaimed / rate-limited -> fall back to the static mirror
-  // deployed alongside this page so the app never opens blank. A later write
-  // (cloudPush) will auto-recreate the blob from whatever data we have.
+  // Primary: GitHub repo data.json (live, cross-device)
+  try {
+    const resp = await fetch(GITHUB_RAW + '?_=' + Date.now(), { cache: 'no-store' });
+    if (resp.ok) {
+      const raw = await resp.json();
+      if (raw && raw.data && raw.data.inventory) return { data: raw.data, ts: raw.ts || 0, github: true };
+    }
+  } catch(e) {}
+  // Fall back to the static mirror / baked-in snapshot so the app never blanks
   return await cloudMirrorFallback();
 }
 // Static read-only mirror bundled with the deployment (original full format).
@@ -1066,16 +1059,8 @@ async function convergeToServer(data) {
   } catch(e) {}
 }
 async function convergeToCloud(data) {
-  data = sanitizeDB(data);
-  const id = getBlobId();
-  if (!id) return;
-  try {
-    const payload = compressForCloud(data);
-    await fetch(`${JSONBLOB_BASE}/${id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-  } catch(e) {}
+  // Push to GitHub (no-op without a browser token; LAN server pushes via .ghtoken)
+  await cloudPush(data);
 }
 
 // ===== Conflict-free merge (preserve records from BOTH backends) =====
@@ -1214,7 +1199,7 @@ async function loadDB() {
     blobId = DEFAULT_BLOB_ID;
   }
 
-  const hasCloudConfig = !!blobId;
+  const hasCloudConfig = !!blobId || GITHUB_CLOUD;
 
   // Step 1: Try local server
   let serverReachable = false;
