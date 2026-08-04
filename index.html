@@ -845,6 +845,9 @@ let _syncing = false;          // prevent sync loops
 let _saveCount = 0;            // increments on every local save
 let _pushedCount = 0;          // last save count successfully pushed
 let _syncBusy = false;          // true while a push/pull is in flight (for badge)
+let _syncError = false;         // true when last browser-token push failed (phone)
+let _syncErrorLabel = '';       // badge label shown in the error state
+let _lastPushErr = '';          // ''=ok, 'auth'=401/403, 'network', 'http###', 'conflict'
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -1030,6 +1033,7 @@ async function cloudPush(data) {
   // public site / phone). When absent, local edits are pushed by the LAN server.
   const tok = (typeof localStorage !== 'undefined') ? (localStorage.getItem('gh_token') || '') : '';
   if (!tok) return false;
+  _lastPushErr = '';
   // Merge with the latest cloud copy first so a phone edit never clobbers a
   // record another device just pushed (multi-device safe, no data loss).
   try {
@@ -1056,11 +1060,25 @@ async function cloudPush(data) {
         headers: { 'Authorization': 'token ' + tok, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: 'TireOS update', content, sha })
       });
-      if (resp.ok) { _lastSyncTs = data.ts || _lastSyncTs; return true; }
+      if (resp.ok) {
+        _lastSyncTs = data.ts || _lastSyncTs;
+        _syncError = false; _syncErrorLabel = '';
+        return true;
+      }
       if (resp.status === 409) { continue; } // conflict, refetch + retry
+      // 401/403 => token rejected; other => server/permission issue
+      if (resp.status === 401 || resp.status === 403) _lastPushErr = 'auth';
+      else _lastPushErr = 'http' + resp.status;
+      if (!_serverMode) { _syncError = true; _syncErrorLabel = (_lastPushErr === 'auth') ? '令牌错误' : '同步失败'; }
       return false;
-    } catch(e) { return false; }
+    } catch(e) {
+      _lastPushErr = 'network';
+      if (!_serverMode) { _syncError = true; _syncErrorLabel = '同步失败'; }
+      return false;
+    }
   }
+  _lastPushErr = 'conflict';
+  if (!_serverMode) { _syncError = true; _syncErrorLabel = '同步失败'; }
   return false;
 }
 
@@ -1694,7 +1712,9 @@ function getSyncState() {
   let hasTok = false;
   try { hasTok = !!localStorage.getItem('gh_token'); } catch(e) {}
   if (_syncBusy) return { cls:'sync', label:'同步中' };
-  if (hasTok && (_cloudMode || _serverMode)) return { cls:'on', label:'已同步' };
+  if (_syncError) return { cls:'warn', label:_syncErrorLabel || '同步失败' };
+  if (_serverMode) return { cls:'on', label:'已同步' };            // desktop: server drives sync
+  if (hasTok && _cloudMode) return { cls:'on', label:'已同步' };   // phone: token present + cloud active
   if (hasTok) return { cls:'on', label:'已连接' };
   return { cls:'off', label:'未连接' };
 }
@@ -1763,21 +1783,23 @@ async function saveSyncToken() {
   try { localStorage.setItem('gh_token', tok); } catch(e) {}
   closeSyncModal();
   _cloudMode = true;
-  updateSyncBadge();
   _syncBusy = true; updateSyncBadge();
-  const ok = await cloudPush(sanitizeDB(db));
+  await cloudPush(sanitizeDB(db));   // records _lastPushErr / _syncError internally
   _syncBusy = false; updateSyncBadge();
-  if (ok) {
+  if (_lastPushErr === '') {
     toast('同步成功 ✓');
     // Pull fresh cloud data so the device immediately reflects latest truth
     const d = await fetchCloudData();
     if (d && d.data) { db = mergeDBs(db, d.data) || db; saveDB(); renderSidebar(); renderHeader(); renderCurrentView(); }
+  } else if (_lastPushErr === 'auth') {
+    toast('令牌无效或无权限，请改用经典 ghp_ 令牌（勾选 repo）');
   } else {
-    toast('令牌无效或无权限，请检查');
+    toast('同步失败：' + _lastPushErr + '，请重试');
   }
 }
 function clearSyncToken() {
   try { localStorage.removeItem('gh_token'); } catch(e) {}
+  _syncError = false; _syncErrorLabel = ''; _lastPushErr = '';
   closeSyncModal();
   updateSyncBadge();
   toast('已断开同步（本机只读）');
